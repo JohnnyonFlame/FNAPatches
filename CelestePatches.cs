@@ -21,7 +21,7 @@ public static class CelestePatches
     public static bool bloomEnabled = false;
     public static byte lightingPreset = 0;
     public static bool particlesEnabled = false;
-    public static bool dustEdgesEnabled = false;
+    public static bool dustEdgesEnabled = true;
     public static byte gaussianBlurPreset = 0;
 
     public static int gfxPreset = 1;
@@ -106,7 +106,7 @@ public static class CelestePatches
                     bloomEnabled = false;
                     lightingPreset = 0;
                     particlesEnabled = false;
-                    dustEdgesEnabled = false;
+                    dustEdgesEnabled = true;
                     gaussianBlurPreset = 0;
                     break;
                 case 2: //return "Low";
@@ -114,7 +114,7 @@ public static class CelestePatches
                     bloomEnabled = false;
                     lightingPreset = 1;
                     particlesEnabled = true;
-                    dustEdgesEnabled = false;
+                    dustEdgesEnabled = true;
                     gaussianBlurPreset = 1;
                     break;
                 case 3: //return "Normal";
@@ -148,11 +148,11 @@ public static class CelestePatches
 
         public static void Postfix(bool inGame, EventInstance snapshot, ref TextMenu __result)
         {
-            // Create a shallow list, then depopulate
+            // Create a shallow copy of the original menu, then depopulate it
             List<TextMenu.Item> kept = MenuOptions.menu.items.ToList();
             MenuOptions.menu.Clear();
 
-            // We're ridding ourselves of the header, so recreate it
+            // We're ridding ourselves of the header later, so recreate it
             MenuOptions.menu.Add(new TextMenu.Header(Dialog.Clean("options_title", null)));
 
             // Create our options first
@@ -190,7 +190,7 @@ public static class CelestePatches
                 };
             }, 0, 3, (int)gaussianBlurPreset).Change(i => { SetAndForceCustom(ref gaussianBlurPreset, (byte)i); }));
 
-            // Copy the previous items back
+            // Now copy the previous items back
             foreach (var item in kept.Skip(1))
             {
                 MenuOptions.menu.Add(item);
@@ -198,6 +198,9 @@ public static class CelestePatches
         }
     }
 
+    // ----------------
+    // Particle systems
+    // ----------------
     [HarmonyPatch(typeof(ParticleSystem), nameof(ParticleSystem.Simulate))]
     static class ParticleSystem_Simulate
     {
@@ -236,6 +239,9 @@ public static class CelestePatches
         }
     }
 
+    // -----------------
+    // Lighting Renderer
+    // -----------------
     [HarmonyPatch(typeof(LightingRenderer), nameof(LightingRenderer.BeforeRender))]
     static class LightingRenderer_BeforeRender
     {
@@ -303,6 +309,9 @@ public static class CelestePatches
         }
     }
 
+    // --------------
+    // Bloom Renderer
+    // --------------
     [HarmonyPatch(typeof(BloomRenderer), nameof(BloomRenderer.Apply))]
     static class BloomRenderer_Apply
     {
@@ -312,6 +321,9 @@ public static class CelestePatches
         }
     }
 
+    // ------------------
+    // Distortion Effects
+    // ------------------
     [HarmonyPatch(typeof(Distort), nameof(Distort.Render))]
     static class Distort_Render
     {
@@ -327,6 +339,9 @@ public static class CelestePatches
         }
     }
 
+    // -------------------
+    // DustEdge Processing
+    // -------------------
     [HarmonyPatch(typeof(DustEdges), nameof(DustEdges.BeforeRender))]
     static class DustEdges_BeforeRender
     {
@@ -355,6 +370,9 @@ public static class CelestePatches
         }
     }
 
+    // ------------------
+    // Gaussian Blur Pass
+    // ------------------
     [HarmonyPatch(typeof(GaussianBlur), nameof(GaussianBlur.Blur))]
     static class GaussianBlur_Blur
     {
@@ -372,24 +390,30 @@ public static class CelestePatches
         }
     }
 
+    // --------------------------
+    // Texture Loading Extensions
+    // --------------------------
     [HarmonyPatch(typeof(VirtualTexture), nameof(VirtualTexture.Reload))]
     static class VirtualTexture_Reload
     {
         static bool Prefix(ref VirtualTexture __instance)
         {
+            // Is this a texture?
             string ext = System.IO.Path.GetExtension(__instance.Path);
             if (ext == ".data")
             {
                 string astcEncodedFile = System.IO.Path.ChangeExtension(__instance.Path, ".astc");
                 string astcEncodedFilePath = System.IO.Path.Combine(Engine.ContentDirectory, astcEncodedFile);
 
+                // Is there an ASTC replacement file?
                 if (System.IO.File.Exists(astcEncodedFilePath))
                 {
-                    // usual flow won't be called, so we need to unload here.
-                    __instance.Unload();
-
                     using (FileStream stream = File.OpenRead(astcEncodedFilePath))
                     {
+                        // Usual flow won't be called, so we need to unload here since VirtualTexture.Reload would do so.
+                        __instance.Unload();
+
+                        // Read and parse ASTC header
                         byte[] astc_header = new byte[16];
                         stream.Read(astc_header, 0, 16);
 
@@ -398,13 +422,14 @@ public static class CelestePatches
                         int width = astc_header[7] | astc_header[8] << 8 | astc_header[9] << 16;
                         int height = astc_header[10] | astc_header[11] << 8 | astc_header[12] << 16;
 
+                        // Calculate payload size, then read it
                         int bytes = (((width + block_x - 1) / block_x) * ((height + block_y - 1) / block_y)) * 16;
                         if (stream.Read(VirtualTexture.buffer, 0, bytes) != bytes)
                         {
                             System.Console.WriteLine($"Unexpected end of ASTC stream.");
                         }
 
-                        System.Console.WriteLine($"ASTC image \"{astcEncodedFile}\", {width}x{height} total bytes {bytes}...");
+                        // Upload texture and set parameters
                         __instance.Texture = new Texture2D(Engine.Graphics.GraphicsDevice, width, height, false, SurfaceFormat.Astc4x4EXT);
                         __instance.Texture.SetData<byte>(VirtualTexture.buffer, 0, bytes);
 
@@ -413,7 +438,7 @@ public static class CelestePatches
                         __instance.Width = width;
                         __instance.Height = height;
 
-                        // Texturee successfully loaded, don't alllow the usual execution flow to proceed.
+                        // Texture successfully loaded, don't allow the usual execution flow to proceed.
                         return false;
                     }
                 }
@@ -438,4 +463,3 @@ namespace System.Runtime.CompilerServices
         public string AssemblyName { get; }
     }
 }
-

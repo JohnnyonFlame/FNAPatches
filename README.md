@@ -4,7 +4,7 @@
 This repository contains game-specific hacks and patches for Mono/FNA games on low power SBCs and handhelds, and the
 required tooling to comfortably develop and deploy said patches are provided here.
 
-- **CelestePatches**: An extension to allow loading ASTC4x4 textures.
+- **CelestePatches**: Extensions to allow loading ASTC4x4 textures and Graphical Settings.
 - **SteelAssaultCsPatches**: A series of optimizations targeting low-power devices.
 - **Compiler**: A patch compiler that ignores any and all visibility checks, for close usage with Harmony. Reference
     internal classes, mess with private methods and members, nobody can stop you now.
