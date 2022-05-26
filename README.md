@@ -4,6 +4,7 @@
 This repository contains game-specific hacks and patches for Mono/FNA games on low power SBCs and handhelds, and the
 required tooling to comfortably develop and deploy said patches are provided here.
 
+- **SteamStubs**: A series of 0-stubs to allow DRM-Free games not to crash when Steam's libraries aren't present. 
 - **CelestePatches**: Extensions to allow loading ASTC4x4 textures and Graphical Settings.
 - **SteelAssaultCsPatches**: A series of optimizations targeting low-power devices.
 - **Compiler**: A patch compiler that ignores any and all visibility checks, for close usage with Harmony. Reference
