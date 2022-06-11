@@ -30,6 +30,11 @@ typedef char byte;
 
 // [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
 // [return: MarshalAs(UnmanagedType.I1)]
+STUB(bool, SteamAPI_IsSteamRunning, 0);
+STUB(bool, IsSteamRunning, 0);
+
+// [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
+// [return: MarshalAs(UnmanagedType.I1)]
 // public static extern bool SteamAPI_Init();
 STUB(bool, SteamAPI_Init, 0);
 
@@ -43,6 +48,21 @@ STUB(bool, InitSafe, 0, );
 // public static extern void SteamAPI_Shutdown();
 STUB(void, SteamAPI_Shutdown, 0, );
 STUB(void, Shutdown, 0, );
+
+// [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
+STUB(void, SteamAPI_RunCallbacks, 0, );
+
+// [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
+STUB(void, SteamAPI_RegisterCallback, 0);
+
+// [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
+STUB(void, SteamAPI_UnregisterCallback, 0);
+
+// [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
+STUB(void, SteamAPI_RegisterCallResult, 0);
+
+// [DllImport("steam_api", CallingConvention = CallingConvention.Cdecl)]
+STUB(void, SteamAPI_UnregisterCallResult, 0);
 
 // [DllImport("CSteamworks", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RestartAppIfNecessary")]
 // [return: MarshalAs(UnmanagedType.I1)]
