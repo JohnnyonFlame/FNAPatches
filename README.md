@@ -5,9 +5,11 @@ This repository contains game-specific hacks and patches for Mono/FNA games on l
 required tooling to comfortably develop and deploy said patches are provided here.
 
 - **FMODStudio Fix**: A dead simple FMOD Studio 1.x to FMOD Studio 2.x wrapper.
-- **SteamStubs**: A series of 0-stubs to allow DRM-Free games not to crash when Steam's libraries aren't present. 
+- **SteamStubs**: A series of 0-stubs to allow DRM-Free games not to crash when Steam's libraries aren't present.
 - **CelestePatches**: Extensions to allow loading ASTC4x4 textures and Graphical Settings.
 - **SteelAssaultCsPatches**: A series of optimizations targeting low-power devices.
+- **PanzerPaladinPatches**: Fixes breakage when running non-Steam, breakages on newer FNA builds and does general optimizations.
+- **MMLoader**: Force loading applications with MONOMODDED_*.dll redirection, change the AppDomain's BaseDirectory and more.
 - **Compiler**: A patch compiler that ignores any and all visibility checks, for close usage with Harmony. Reference
     internal classes, mess with private methods and members, nobody can stop you now.
 
@@ -15,7 +17,7 @@ required tooling to comfortably develop and deploy said patches are provided her
 -------------
 
 - **For runtime usage**: Mono, `0Harmony.dll`, and and a custom [FNA build](https://github.com/JohnnyonFlame/FNAHacks).
-- **For development**: .NET v5.0, Mono, `0Harmony.dll` and a custom [FNA build](https://github.com/JohnnyonFlame/FNAHacks).
+- **For development**: .NET v5.0, Mono, `0Harmony.dll` (for Harmony mods), MonoMod (for MonoMod mods) and a custom [FNA build](https://github.com/JohnnyonFlame/FNAHacks).
 
 ### Usage:
 -------------
@@ -36,8 +38,10 @@ dotnet restore
 dotnet build
 ```
 - For convenience, create both `build` and `redist` folders.
-- Download a release of [Harmony](https://github.com/pardeike/Harmony/releases).
-- Extract `net45/0Harmony.dll` into the `redist` folder.
+- Optionally (for Harmony mods): Download a release of [Harmony](https://github.com/pardeike/Harmony/releases).
+    - Extract `net45/0Harmony.dll` into the `redist` folder.
+- Optionally (for MonoMod mods): Download a release of [MonoMod](https://github.com/MonoMod/MonoMod/releases).
+    - Extract the files into the `redist` folder.
 - Copy the custom FNA assemblies into the `redist` folder.
 - Compile your patch!
 ```bash
