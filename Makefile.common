@@ -1,0 +1,26 @@
+MONO_PREFIX ?= /usr
+MONO ?= $(MONO_PREFIX)/bin/mono
+MCS ?= $(MONO_PREFIX)/bin/mcs
+MONO_PATH ?= $(MONO_PREFIX)/lib/mono/4.5
+COMMON_DEPS := $(MONO_PATH)/mscorlib.dll $(MONO_PATH)/Facades/netstandard.dll $(wildcard $(MONO_PATH)/*.dll)
+COMPILER ?= VisFree/bin/Release/VisFree.exe
+
+-include $(MAKECMDGOALS)/Makefile.inc
+
+.PHONY: out/$(MAKECMDGOALS) MMLoader clean
+
+all:
+clean:
+	rm -rf out/
+
+$(MAKECMDGOALS): out/$(MAKECMDGOALS) $(ASM)
+
+out/$(MAKECMDGOALS):
+	@mkdir -p out/$(MAKECMDGOALS)/
+
+out/$(MAKECMDGOALS)/%.dll: $(MAKECMDGOALS)/%.cs
+	@MONO_PATH=$(MONO_PATH) $(MONO) $(COMPILER) $@ $< -- $(DEPS) $(COMMON_DEPS)
+
+MMLoader: out/MMLoader out/MMLoader/MMLoader.exe
+out/MMLoader/MMLoader.exe: MMLoader.cs
+	@MONO_PATH=$(MONO_PATH) $(MCS) -optimize MMLoader.cs /out:out/MMLoader/MMLoader.exe

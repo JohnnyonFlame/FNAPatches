@@ -1,0 +1,11 @@
+**/bin/**
+**/obj/**
+out/**
+deps/**
+**/monomod/**
+**/*.dll
+**/*.exe
+!deps/*/.*here
+!deps/FNA
+!deps/Harmony
+!deps/MonoMod

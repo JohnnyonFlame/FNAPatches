@@ -1,0 +1,2 @@
+You should extract the necessary FNA build here, you should have the follwoing files:
+FNA.dll OpenAL-CS.dll SDL2-CS.dll

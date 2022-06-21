@@ -1,0 +1,7 @@
+You should have the following files on this directory:
+0Harmony.dll                              Mono.Cecil.Pdb.dll         MonoMod.Common.dll  MonoMod.DebugIL.exe.config
+0Harmony.xml                              Mono.Cecil.Rocks.dll       MonoMod.Common.xml  MonoMod.DebugIL.xml
+Mono.Cecil.Mdb.dll                        Mono.Cecil.dll             MonoMod.DebugIL.exe MonoMod.RuntimeDetour.HookGen.exe
+MonoMod.RuntimeDetour.HookGen.exe.config  MonoMod.RuntimeDetour.xml  MonoMod.Utils.dll   MonoMod.exe.config
+MonoMod.RuntimeDetour.HookGen.xml         MonoMod.UnitTest.dll       MonoMod.Utils.xml   MonoMod.xml
+MonoMod.RuntimeDetour.dll                 MonoMod.UnitTest.xml       MonoMod.exe
