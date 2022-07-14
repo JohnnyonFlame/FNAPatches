@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <AssemblySearchPaths>$(AssemblySearchPaths);{GAC};..\deps;..\deps\TMNTSR-Mods;..\deps\MonoMod;..\deps\Cecil</AssemblySearchPaths>
+    <ReferencePath>.\deps;$(ReferencePath)</ReferencePath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="FNA" />
+    <Reference Include="MonoMod" />
+    <Reference Include="Mono.Cecil" />
+    <Reference Include="TMNT" />
+    <Reference Include="ParisEngine" />
+  </ItemGroup>
+
+</Project>
