@@ -2,8 +2,9 @@ MONO_PREFIX ?= /usr
 MONO ?= $(MONO_PREFIX)/bin/mono
 MCS ?= $(MONO_PREFIX)/bin/mcs
 MONO_PATH ?= $(MONO_PREFIX)/lib/mono/4.5
-COMMON_DEPS := $(MONO_PATH)/mscorlib.dll $(MONO_PATH)/Facades/netstandard.dll $(wildcard $(MONO_PATH)/*.dll)
+COMMON_DEPS := $(MONO_PATH)/Facades/netstandard.dll $(MONO_PATH)/mscorlib.dll $(MONO_PATH)/Facades/System.Runtime.dll $(wildcard $(MONO_PATH)/*.dll)
 COMPILER ?= VisFree/bin/Release/VisFree.exe
+HOOK_GEN ?= MonoMod.RuntimeDetour.HookGen.exe
 
 -include $(MAKECMDGOALS)/Makefile.inc
 
@@ -17,6 +18,12 @@ $(MAKECMDGOALS): out/$(MAKECMDGOALS) $(ASM)
 
 out/$(MAKECMDGOALS):
 	@mkdir -p out/$(MAKECMDGOALS)/
+
+deps/$(MAKECMDGOALS)/MMHOOK_%.dll: deps/$(MAKECMDGOALS)/%.exe
+	@cd deps/MonoMod && MONO_PATH=$(MONO_PATH) $(MONO) $(HOOK_GEN) ../../$^
+
+deps/$(MAKECMDGOALS)/MMHOOK_%.dll: deps/$(MAKECMDGOALS)/%.dll
+	@cd deps/MonoMod && MONO_PATH=$(MONO_PATH) $(MONO) $(HOOK_GEN) ../../$^
 
 out/$(MAKECMDGOALS)/%.dll: $(MAKECMDGOALS)/%.cs
 	@MONO_PATH=$(MONO_PATH) $(MONO) $(COMPILER) $@ $< -- $(DEPS) $(COMMON_DEPS)

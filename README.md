@@ -11,6 +11,7 @@ required tooling to comfortably develop and deploy said patches are provided her
 - **CelestePatches**: Extensions to allow loading ASTC4x4 textures and Graphical Settings.
 - **SteelAssaultCsPatches**: A series of optimizations targeting low-power devices.
 - **PanzerPaladinPatches**: Fixes breakage when running non-Steam, newer FNA builds and does general optimizations.
+- **BleedPatches**: Fixes startup failures on certain FNA+SDL2 combinations. 
 - **MMLoader**: Force loading applications with MONOMODDED_*.dll redirection, change the AppDomain's BaseDirectory and more.
 
 ### Usage:
