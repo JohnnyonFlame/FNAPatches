@@ -13,6 +13,7 @@ required tooling to comfortably develop and deploy said patches are provided her
 - **PanzerPaladinPatches**: Fixes breakage when running non-Steam, newer FNA builds and does general optimizations.
 - **BleedPatches**: Fixes startup failures on certain FNA+SDL2 combinations.
 - **TMNTSR-Mods**: Load custom sound assets on TMNT: Shredder's Revenge.
+- **TMNTSRPatches**: Provides Performance settings, fixes Deadlocks on OpenGL, fixes file paths on Linux and more. 
 - **MMLoader**: Force loading applications with MONOMODDED_*.dll redirection, change the AppDomain's BaseDirectory and more.
 
 ### Usage:
