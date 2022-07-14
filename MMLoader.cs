@@ -1,12 +1,12 @@
-using System;
 using System.Collections.Generic;
-using System.Security.Policy;
 using System.IO;
-using System.Runtime.CompilerServices;
-using System.Reflection;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Policy;
+using System.Threading;
+using System;
 
 public class MMLoader {
     public static void Main(string[] args)
@@ -49,7 +49,9 @@ public class MMLoader {
 
         // Create domain and load the base assembly
         Evidence evidence = new Evidence(AppDomain.CurrentDomain.Evidence);
-        AppDomain domain = AppDomain.CreateDomain(assemblyName.Name, evidence, appBasePath, appBasePath, false);       
+        AppDomain domain = AppDomain.CreateDomain(assemblyName.Name, evidence, appBasePath, appBasePath, false);
+        // This can cause issue with Assemblies that use the assembly path, such as Logging libraries
+        //domain.Load(File.ReadAllBytes(Path.GetFullPath(args[0])));
 
         // See if we have MONOMODDED versions to load first...
         foreach (var asm in assembly.GetReferencedAssemblies())
