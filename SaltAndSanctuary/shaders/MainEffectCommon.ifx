@@ -1,0 +1,147 @@
+// main.fx
+// XNA
+
+sampler samplerState : register(s0);
+sampler lightTex : register(s1);
+sampler bayerTex: register(s2);
+
+// main pass
+cbuffer MyBuffer
+{
+	float3 tColor = float3(0.0f, 0.0f, 0.0f);
+	float3 bColor = float3(0.0f, 0.0f, 0.0f);
+	float3 burnColor = float3(0.0f, 0.0f, 0.0f);
+
+	//float sat = 1.0f;
+	float brite = 0.0f;
+
+	float gamma = 0.0f;
+
+	float k = -0.05f;
+	float kcube = 0.25f;
+
+	float alpha = 1.0f;
+	float floorVal = 0.2f;
+	float lightFac = 1.0f;
+	float lightFacBloom = 1.0f;
+
+	float BloomVignette;
+	float BaseIntensity;
+	float BaseSaturation;
+	float lightThresh = 0.5f;
+	float2 lightRedBlue = float2(0.5f, 3.0f);
+	float lightDesat = 1.0f;
+	float darkBlur = 0.5f;
+
+	float2 Dimensions;
+	float ditherMinPixel;
+};
+
+// Helper for modifying the saturation of a color.
+float3 AdjustSaturation(float3 color, float saturation)
+{
+	// The constants 0.3, 0.59, and 0.11 are chosen because the
+	// human eye is more sensitive to green light, and less to blue.
+	float grey = dot(color, float3(0.3, 0.59, 0.11));
+
+	return lerp(grey, color, saturation);
+}
+
+void SpriteVertexShader(
+	inout float4 color    : COLOR0,
+	inout float2 texCoord : TEXCOORD0,
+	inout float4 position : SV_Position)
+{
+}
+
+float4 Main(
+	float4 color : COLOR0,
+	float2 texCoord : TEXCOORD0) : SV_Target0
+{
+	float4 col = tex2D(samplerState, texCoord);
+
+	float2 vDif = texCoord - 0.5f;
+	vDif = vDif * vDif;
+
+	float dif = saturate(vDif.x + vDif.y);
+	// Stock shader would've applied some dithering based on the noise texture
+	// we don't do that.
+
+	// Do mainEffect pass
+	float3 gBurn = col.rgb * burnColor;
+	col.rgb *= lerp(tColor, bColor, texCoord.y);
+	col.rgb = lerp(col.rgb, gBurn, dif);
+	col.rgb = saturate(gamma + col.rgb * brite);
+
+#if HAS_LIGHTS
+	// Do light pass
+	float4 lightCol = tex2D(lightTex, texCoord);
+	float aFac = lightCol.r;
+
+	// if (aFac > 0.5f)
+	// 	aFac = 1.0f - aFac;
+	// aFac *= 4.0f;
+	// if (aFac > 1.0f)
+	// 	aFac = 1.0f;
+	// -- OR --
+	aFac = saturate(-(abs(aFac-0.5f)-0.5f)*4.0f);
+
+
+	float preC = dot(lightCol.rgb, 1.0 / 3.0);
+	float c = preC + aFac * lightFac;
+	//if (c >= 0.9f)
+	//    c = 1.0f;
+	//if (c <= 0.0f)
+	//	c = 0.0f;
+	// -- OR --
+	c = saturate(c);
+
+	// Perform the subtractive blending manually
+	col.rgb = saturate(col.rgb - (c * alpha));
+#else
+	float preC = 1.0f;
+#endif
+
+#if HAS_BLUR == 0
+	float lightBalance = 0.0f;
+	float difVignette = length(texCoord - 0.5f);
+	float tBase = BaseIntensity - difVignette * BloomVignette;
+	float baseSat = BaseSaturation;
+
+	float lightIntensity = 1.0f - preC;
+	float satFac = 1.0f + (lightIntensity - 1.0f) * lightFacBloom * lightDesat;
+
+	// Original code had some conditionals here, it's not necessary, just limit
+	// lightFacBloom to not be negative and we're golden
+	baseSat *= satFac;
+	tBase -= (1.0f - lightIntensity) * lightFacBloom * darkBlur;
+	lightBalance = (lightIntensity - lightThresh) * lightFacBloom;
+
+	col.rgb = AdjustSaturation(col.rgb, baseSat) * tBase;
+	
+	//if (lightBalance < 0.0f)
+	//	col.b *= (1.0f + lightBalance * -lightBlue);
+	//if (lightBalance > 0.0f)
+	//	col.r *= (1.0f + lightBalance * lightRed);
+	// -- OR --
+	float direction = step(0.0f, lightBalance);
+	float2 directions = float2(direction, 1-direction);
+	col.rb *= (1.0f + lightBalance * lightRedBlue * directions);
+
+	col.rgb = saturate(col.rgb);
+#endif
+	float2 texCoordDither = texCoord * Dimensions;
+	float ditherValue = tex2D(bayerTex, texCoordDither).a * ditherMinPixel;
+
+	// Do subtractive blend
+	return float4(col.rgb + ditherValue, 1.0f); 
+}
+
+technique MainTechnique
+{
+	pass P0
+	{
+		//VertexShader = compile vs_3_0 SpriteVertexShader();
+		PixelShader = compile ps_3_0 Main();
+	}
+}

@@ -9,3 +9,8 @@ deps/**
 !deps/FNA
 !deps/Harmony
 !deps/MonoMod
+**/shaders/out/**
+dxsdk/*
+!dxsdk/.copy_fxc_exe_here
+shaders/out/*
+.vscode/**
