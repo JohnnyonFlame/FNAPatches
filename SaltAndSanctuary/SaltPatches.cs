@@ -1366,6 +1366,10 @@ public static class SaltPatches
 			List<Point> list = new List<Point>();
 			foreach (DisplayMode displayMode in dev.Adapter.SupportedDisplayModes)
 			{
+				// Ensure no silly modes, we only guarantee 480x320 and above.
+				if (displayMode.Width < 480 || displayMode.Height < 320)
+					continue;
+
 				// RG552 won't handle this game at full-res, force half-res instead
 				if (displayMode.Width == 1920 && displayMode.Height == 1152)
 				{
@@ -1376,8 +1380,15 @@ public static class SaltPatches
 					list.Add(new Point(displayMode.Width, displayMode.Height));
 				}
 			}
+
+			// We somehow failed to get _ANY_ video mode, add the smallest mode
+			// we know that is okay.
+			if (list.Count == 0)
+			{
+				list.Add(new Point(480, 320));
+			}
+
 			__result = list;
-		
 			return false;
 		}
 	}
@@ -3303,6 +3314,45 @@ public static class SaltPatches
 					newCodes.Add(new CodeInstruction(OpCodes.Call, AddMissingOptionsMethod));
 					Console.WriteLine($"Patched ConfigMgr at ConfigMgr:Read+{i+9}! (reloc: {reloc.LocalIndex})");
 					codes.InsertRange(i+9, newCodes);
+					break;
+				}
+			}
+			
+			return codes.AsEnumerable();
+		}
+	}
+
+	[HarmonyPatch(typeof(Game1), nameof(Game1.Initialize))]
+	public static class Game1_Initialize
+	{
+		public static void changeDefaults()
+		{
+			List<Point> modes = VideoOptions.GetResolutions(Game1.graphics.GraphicsDevice);
+			ConfigMgr.displayWidth = modes[0].X;
+			ConfigMgr.displayHeight = modes[0].Y;
+			ConfigMgr.hudVis = 1;
+			Console.WriteLine($"Choosing default resolution {ConfigMgr.displayWidth}x{ConfigMgr.displayHeight}.");
+		}
+
+		static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+		{
+			Console.WriteLine($"Patching Game1 at Game1:Initialize...");
+			var codes = new List<CodeInstruction>(instructions);
+			for (int i = 0; i < codes.Count-8; i++)
+			{
+				if (
+					codes[i].opcode   == OpCodes.Ldc_I4 && (int)codes[i].operand   == 1920                         && // 8	0018	ldc.i4	0x780
+					codes[i+1].opcode == OpCodes.Stsfld && codes[i+1].operand.ToString().Contains("displayWidth")  && // 9	001D	stsfld	int32 ProjectTower.config.ConfigMgr::displayWidth
+					codes[i+2].opcode == OpCodes.Ldc_I4 && (int)codes[i+2].operand == 1080                         && // 10	0022	ldc.i4	0x438
+					codes[i+3].opcode == OpCodes.Stsfld && codes[i+3].operand.ToString().Contains("displayHeight")    // 11	0027	stsfld	int32 ProjectTower.config.ConfigMgr::displayHeight
+				)
+				{
+					MethodInfo changeDefaultsMethod = typeof(Game1_Initialize).GetMethod("changeDefaults", BindingFlags.Public | BindingFlags.Static);
+					List<CodeInstruction> newCodes = new List<CodeInstruction>();
+					newCodes.Add(new CodeInstruction(OpCodes.Call, changeDefaultsMethod));
+					Console.WriteLine($"Patched Game1 at Game1:Initialize+{i}!");
+					codes.RemoveRange(i, 4);
+					codes.InsertRange(i, newCodes);
 					break;
 				}
 			}
