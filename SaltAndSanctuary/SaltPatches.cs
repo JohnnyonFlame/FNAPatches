@@ -2619,7 +2619,7 @@ public static class SaltPatches
 		public static int ITEM_MAX_LEVEL;
 		public static int ITEM_ADDED;
 
-		public static int gfxPreset = 0;
+		public static int gfxPreset = 1;
 		public static int zoomLevel = 4;
 
 		static void Postfix(VideoOptions __instance)
