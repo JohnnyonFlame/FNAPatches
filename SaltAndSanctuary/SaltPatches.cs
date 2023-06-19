@@ -3335,6 +3335,7 @@ public static class SaltPatches
 			ConfigMgr.displayWidth = modes[0].X;
 			ConfigMgr.displayHeight = modes[0].Y;
 			ConfigMgr.hudVis = 1;
+			ConfigMgr.hudSize = 3;
 			Game1_Initialize.game = gameInstance;
 			Console.WriteLine($"Choosing default resolution {ConfigMgr.displayWidth}x{ConfigMgr.displayHeight}.");
 		}
