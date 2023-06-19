@@ -246,13 +246,13 @@ public static class SaltPatches
 			}
 
 
-			simplifiedTintBloomEffect = (Game1.game as Game).Content.Load<Effect>("fx/SimplifiedTintBloom.fxb");
-			mainEffectLightsBloom = (Game1.game as Game).Content.Load<Effect>("fx/MainEffectLightsBlur.fxb");
-			mainEffectLightsNoBloom = (Game1.game as Game).Content.Load<Effect>("fx/MainEffectLightsNoBlur.fxb");
-			mainEffectNoLightsBloom = (Game1.game as Game).Content.Load<Effect>("fx/MainEffectNoLightsBlur.fxb");
-			mainEffectNoLightsNoBloom = (Game1.game as Game).Content.Load<Effect>("fx/MainEffectNoLightsNoBlur.fxb");
-			clearAlphaEffect = (Game1.game as Game).Content.Load<Effect>("fx/ClearAlpha.fxb");
-			mapBloodEffect = (Game1.game as Game).Content.Load<Effect>("fx/MapBlood.fxb");
+			simplifiedTintBloomEffect = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/SimplifiedTintBloom.fxb");
+			mainEffectLightsBloom = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MainEffectLightsBlur.fxb");
+			mainEffectLightsNoBloom = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MainEffectLightsNoBlur.fxb");
+			mainEffectNoLightsBloom = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MainEffectNoLightsBlur.fxb");
+			mainEffectNoLightsNoBloom = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MainEffectNoLightsNoBlur.fxb");
+			clearAlphaEffect = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/ClearAlpha.fxb");
+			mapBloodEffect = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MapBlood.fxb");
 			mainEffect = mainEffectNoLightsBloom;	
 			isLoaded = true;
 		}
@@ -374,7 +374,9 @@ public static class SaltPatches
 			SpriteTools.BeginAdditive();
 			ParticleManager.Draw(5);
 			SpriteTools.End();
-			Water.Update(MapMgr.GetMap().layer[5], 5, MapMgr.map, p);
+			// Just reference the map field directly... needed for 1.0.0.8
+			//Water.Update(MapMgr.GetMap().layer[5], 5, MapMgr.map, p);
+			Water.Update(MapMgr.map.layer[5], 5, MapMgr.map, p);
 			Water.Prepare(GameDraw.backTarg);
 			GraphicsDevice.SetRenderTarget(GameDraw.mainTarg);
 			GraphicsDevice.Clear(new Color(0f, 0f, 0f, 1f));
@@ -954,7 +956,8 @@ public static class SaltPatches
 			CharSequenceMgr.Prepare(GraphicsDevice);
 
 			// We'll just use the previous frame... :)
-			Water.Update(MapMgr.GetMap().layer[5], 5, MapMgr.map, p);
+			//Water.Update(MapMgr.GetMap().layer[5], 5, MapMgr.map, p);
+			Water.Update(MapMgr.map.layer[5], 5, MapMgr.map, p);
 			Water.Prepare(GameDraw.sceneTarg);
 
 			// Prepare lightmaps
@@ -3325,12 +3328,14 @@ public static class SaltPatches
 	[HarmonyPatch(typeof(Game1), nameof(Game1.Initialize))]
 	public static class Game1_Initialize
 	{
-		public static void changeDefaults()
+		public static Game1 game = null;
+		public static void changeDefaults(Game1 gameInstance)
 		{
 			List<Point> modes = VideoOptions.GetResolutions(Game1.graphics.GraphicsDevice);
 			ConfigMgr.displayWidth = modes[0].X;
 			ConfigMgr.displayHeight = modes[0].Y;
 			ConfigMgr.hudVis = 1;
+			Game1_Initialize.game = gameInstance;
 			Console.WriteLine($"Choosing default resolution {ConfigMgr.displayWidth}x{ConfigMgr.displayHeight}.");
 		}
 
@@ -3349,6 +3354,7 @@ public static class SaltPatches
 				{
 					MethodInfo changeDefaultsMethod = typeof(Game1_Initialize).GetMethod("changeDefaults", BindingFlags.Public | BindingFlags.Static);
 					List<CodeInstruction> newCodes = new List<CodeInstruction>();
+					newCodes.Add(new CodeInstruction(OpCodes.Ldarg_0));
 					newCodes.Add(new CodeInstruction(OpCodes.Call, changeDefaultsMethod));
 					Console.WriteLine($"Patched Game1 at Game1:Initialize+{i}!");
 					codes.RemoveRange(i, 4);
