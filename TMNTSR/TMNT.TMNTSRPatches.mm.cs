@@ -1,12 +1,21 @@
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Paris.Engine.Menu.Control;
 using Paris.Engine.Scene;
+using Paris.Engine.Graphics;
+using Paris.Engine.Audio;
+using Paris.Engine.Cutscenes;
+using Paris.Engine.Save;
+using Paris.Game.Data;
+using Paris.System.Input;
+using Paris.Engine;
 using Paris.Game.System.Pathfinding;
 using Paris.Game;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System;
+using MonoMod;
 
 #pragma warning disable 1591
 #pragma warning disable CS0649
@@ -14,6 +23,57 @@ using System;
 
 namespace Paris.Game.Menu
 {
+    public class patch_LogoScreen: LogoScreen
+    {
+        public override void Tick(float deltaTime)
+        {
+            GameContextManager singleton = GameContextManager.Singleton;
+            if (singleton.Fadestate == FadeState.FadedIn)
+            {
+                if (!_startedSFX && _sfx != null)
+                {
+                    _sfx.Play();
+                    _sfx.Volume = AudioManager.Singleton.FinalSoundVolume;
+                    _startedSFX = true;
+                }
+                _animatedLogo.Tick(deltaTime);
+                if (_logoTimer > 0f)
+                {
+                    _logoTimer -= deltaTime;
+                }
+                ulong handle = 0uL;
+                bool flag = InputManagerBase.Singleton.SomeonePressedSomething(true, false, out handle) != ParisInputType.None;
+                if (_logoTimer <= 0f || (!SaveSystemBase.Singleton.Loading && flag))
+                {
+                    if (_sfx != null && _sfx.State == SoundState.Playing)
+                    {
+                        _sfx.Stop();
+                    }
+                    _skippedLast = flag;
+                    if (HasNextLogo)
+                    {
+                        singleton.RequestFadeOut(_skippedLast ? 0.1f : 0.5f, _clearColor);
+                        return;
+                    }
+                    if (CheatManager.Singleton.IsActive(16))
+                    {
+                        singleton.SwitchToContext(GameSettings.Singleton.GameContextMainMenu, _skippedLast ? 0.1f : 0.5f, _clearColor);
+                        return;
+                    }
+                    VideoContext.VideoPath = "Videos\\PATCH_TMNT_GameIntro";
+                    VideoContext.NextContext = GameSettings.Singleton.GameContextMainMenu;
+                    singleton.SwitchToContext(typeof(VideoContext).AssemblyQualifiedName, _skippedLast ? 0.1f : 0.5f, _clearColor);
+                }
+            }
+            else if (singleton.Fadestate == FadeState.FadedOut)
+            {
+                LoadNextLogo();
+                singleton.RequestFadeIn(_skippedLast ? 0.3f : 0.5f);
+                _skippedLast = false;
+            }
+        }
+    } 
+
     public class patch_Options: Options
     {
         public static int shadowPreset = 1;
@@ -90,7 +150,8 @@ namespace Paris.Game.Menu
         new public void SetupOptions(Options.MenuSchemes menuScheme, SelectionMenuControl selectionControl)
         {
             orig_SetupOptions(menuScheme, selectionControl);
-
+#if false
+            // Disabled, does very little.
             this._shadowController = InsertOptionsItemString(selectionControl, "Shadows");
             this._shadowController.AddOption("Off");    // 0
             this._shadowController.AddOption("Low");    // 1
@@ -101,7 +162,7 @@ namespace Paris.Game.Menu
                 SaveModConfig();
                 this.HaveChanged = true;
             });
-
+#endif
             this._reducedRatsController = InsertOptionsItemString(selectionControl, "Rat Count");
             this._reducedRatsController.AddOption("Normal");
             this._reducedRatsController.AddOption("Low");

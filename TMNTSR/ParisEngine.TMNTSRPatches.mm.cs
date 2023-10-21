@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 using MonoMod;
+using Paris.Engine.Graphics.Animations;
 using Paris.Engine.Context;
 using Paris.Engine.Data;
 using Paris.Engine.Graphics;
@@ -9,6 +10,9 @@ using Paris.Engine.Scene;
 using Paris.Engine.System;
 using Paris.Engine;
 using Paris.System.Helper;
+using Paris.Game.System;
+using Paris.Game.System.Progression;
+using Paris.Engine.System.Helper;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
@@ -35,77 +39,86 @@ namespace Paris.Engine.Save
     }
 }
 
-namespace Paris.System.Context
+namespace Paris.Engine.Context
 {
     public class patch_ContextManager: ContextManager
     {
         patch_ContextManager(Microsoft.Xna.Framework.Game game): base(game) { }
-        new public virtual void Init()
-		{
-			Vector2 gameResolution = EngineSettings.Singleton.GameResolution;
-			ContextManager._postRenderTarget = new RenderTarget2D(
-                Renderer.Singleton.GraphicsDevice,
-                (int)gameResolution.X,
-                (int)gameResolution.Y,
-                false,
-                SurfaceFormat.Color,
-                DepthFormat.Depth16,
-                0,
-                RenderTargetUsage.DiscardContents);
-			ContextManager._displayRenderTarget = new RenderTarget2D(
-                Renderer.Singleton.GraphicsDevice,
-                (int)gameResolution.X,
-                (int)gameResolution.Y,
-                false,
-                SurfaceFormat.Color,
-                DepthFormat.None,
-                0,
-                RenderTargetUsage.DiscardContents);
-			ContextManager._contextRenderViewport = new Viewport(0, 0, (int)gameResolution.X, (int)gameResolution.Y);
-			ContextManager._contextRenderProjection = Matrix.CreateOrthographicOffCenter(0f, gameResolution.X, gameResolution.Y, 0f, 0f, 1f) * Matrix.CreateScale(1f, 1f, -1f);
-			this._loadingState = ContextManager.LoadingState.FadeOut;
-			this._savingIconHUD = this.LoadContent<GameMenu>("Menu\\Project\\SavingHUD");
-			this._savingIconHUD.Init();
-			this._savingIconHUD.Reset();
-			this._loadingAnimation.SetPosition(gameResolution / 2f);
-			this._loadingAnimation.Visible = false;
-			this._shouldRenderLoading = false;
-			this._loadingAnimType = ContextManager.LoadingAnimType.Normal;
-			this._popup = new Popup();
-			this._popup.Init();
-			this._popup.Reset();
-		}
-    }
-}
 
-namespace Paris.System.Helper
-{
-    static class patch_PathManager
-    {
-        public extern static string orig_NormalizePath(string path);
-        public static string NormalizePath(string path)
+        // Due to issues with loading assets async, we will be loading quite a few of these in the main thread,
+        // otherwise, we _will_ cause deadlocks.
+        new public void StartPreLoadingGlobalAssets()
         {
-            // Normalize paths by replacing backslashes.
-            // This fixes failures to find assets on Linux when Steam isn't running.
-            return path.Replace("\\", "/");
+            if (EditorMode || _preloadingState != 0)
+            {
+                return;
+            }
+
+            AttackList.Load();
+            PowerLevelList.Load();
+            SurvivalDimensionList.Load();
+            SurvivalWaveList.Load();
+            SurvivalPowerLevelList.Load();
+            CharacterManager.Singleton.Init();
+
+            // Those can be loaded async, since they have no texture data
+            int i = 0;
+            Action[] array = new Action[4] { PreloadAudio, CacheJsonFiles, CacheReflectionInfo, PreloadPoolObjects };
+            foreach (Action action in array)
+            {
+                Thread thread = new Thread(action.Invoke);
+                thread.Priority = ThreadPriority.BelowNormal;
+                thread.IsBackground = true;
+                thread.Name = string.Format("Preload : {0}", action.Method.Name);
+                mGlobalLoadingThreads.Add(thread);
+                thread.Start();
+            }
+
+            // This has to be loaded by the main thread.
+            LoadGlobalContent();
+
+            // These might have texture data, so they have to be loaded by the
+            // main thread. 
+            foreach (Type loadableType in Assembly.GetCallingAssembly().GetLoadableTypes())
+            {
+                if (typeof(IPreloadable).IsAssignableFrom(loadableType))
+                {
+                    IPreloadable parameter = (IPreloadable)Activator.CreateInstance(loadableType);
+                    PreloadCustom(parameter);
+                }
+            }
+
+            _preloadingState |= PreloadingState.CustomPreloaders;
         }
     }
 }
 
 namespace Paris.Engine.System.Networking
 {
-    // Fix story mode crash in earlier versions
+    // Fix story mode crashes
     class patch_NetworkManager: NetworkManager
     {
         public extern virtual void orig_Disconnect(bool transition = false);
         new public virtual void Disconnect(bool transition = false)
         {
-            try
-            {
-                orig_Disconnect(transition);
-            }
-            catch (Exception){ }
+            // try
+            // {
+            //     orig_Disconnect(transition);
+            // }
+            // catch (Exception){ }
         }
+
+        public extern virtual void orig_ChangeLobbyLocked(bool isLocked);
+        new public virtual void ChangeLobbyLocked(bool isLocked)
+        {
+            // try
+            // {
+            //     orig_ChangeLobbyLocked(isLocked);
+            // }
+            // catch (Exception){ }
+        }
+
+
     }
 }
 
@@ -129,22 +142,22 @@ namespace Paris.Engine {
         }
 
         new void Update(GameTime gameTime)
-		{
-			lock (this.updateableComponents)
-			{
-				for (int i = 0; i < this.updateableComponents.Count; i++)
-				{
-					this.currentlyUpdatingComponents.Add(this.updateableComponents[i]);
-				}
-			}
+        {
+            lock (this.updateableComponents)
+            {
+                for (int i = 0; i < this.updateableComponents.Count; i++)
+                {
+                    this.currentlyUpdatingComponents.Add(this.updateableComponents[i]);
+                }
+            }
 
-			foreach (IUpdateable updateable in this.currentlyUpdatingComponents)
-			{
-				if (updateable.Enabled)
-				{
-					updateable.Update(gameTime);
-				}
-			}
+            foreach (IUpdateable updateable in this.currentlyUpdatingComponents)
+            {
+                if (updateable.Enabled)
+                {
+                    updateable.Update(gameTime);
+                }
+            }
 
             // Big ugly.
             if (frameworkDispatchWorker == null)
@@ -153,7 +166,7 @@ namespace Paris.Engine {
                 frameworkDispatchWorker.Start();
             }
 
-			this.currentlyUpdatingComponents.Clear();
+            this.currentlyUpdatingComponents.Clear();
 #if false
             elapsedAccum += gameTime.ElapsedGameTime.TotalSeconds;
             elapsedCounter += 1;
@@ -164,8 +177,8 @@ namespace Paris.Engine {
                 elapsedAccum = 0.0f;
             }
 #endif
-			base.IsFixedTimeStep = !Renderer.Singleton.VSync;
-		}
+            base.IsFixedTimeStep = !Renderer.Singleton.VSync;
+        }
     }
 
     public class patch_Stat: Stat
@@ -188,228 +201,6 @@ namespace Paris.Engine {
             // Disable GameAnalytics
         }
     }
-
-    class patch_ParisContentManager: ParisContentManager
-    {
-        public patch_ParisContentManager(IServiceProvider i_service, string i_sRoot) : base(i_service, i_sRoot)
-        {
-        }
-
-        // Can't call double-inherited base functions... so we need this to call the original ContentManager Load method
-        [MonoModLinkTo("Microsoft.Xna.Framework.Content.ContentManager", "Load")]
-        [MonoModForceCall]
-        [MonoModRemove]
-        public extern T ContentManager_Load<T>(string i_assetName);
-
-        public extern T orig_Load<T>(string i_assetName);
-        public override T Load<T>(string i_assetName)
-        {
-            bool isLockAcquired = false;
-            T result;
-            try
-            {
-                // We're changing how this lock works:
-                // only the main thread can upload textures (see: ForceToMainThread in FNA3D_Driver_OpenGL.c), 
-                // if we let the entire method lock, then we basically get deadlocked by the main thread, or starve it 
-                // from this lock, since we'll be waiting for the main thread to consume the requests for texture uploads.
-                // This change fixes deadlocks on preloading caused by using newer FNA builds.
-                this.EnsureLock();
-                isLockAcquired = true;
-                string text = i_assetName.ToLower();
-                if (typeof(T) == typeof(ReloadableTexture))
-                {
-                    text += "Reloadable";
-                }
-                ParisContentManager.ObjectCacheItem objectCacheItem = null;
-                if (!ContextManager.Singleton.Serializing && this.mloadedAssets.TryGetValue(text, out objectCacheItem))
-                {
-                    T t = (T)((object)objectCacheItem.Obj);
-                    if (t != null)
-                    {
-                        // Lock is released by the 'finally' block.
-                        return t;
-                    }
-                    this.mloadedAssets.TryRemove(text, out objectCacheItem);
-                }
-                Stopwatch stopwatch = Stopwatch.StartNew();
-                i_assetName = PathManager.GetPlatformFilename(i_assetName);
-                string text2 = i_assetName.Substring(i_assetName.LastIndexOf('\\') + 1);
-                T t2 = default(T);
-                if (!ContextManager.Singleton.Serializing)
-                {
-                    objectCacheItem = new ParisContentManager.ObjectCacheItem();
-                    objectCacheItem.Name = text2;
-                    ParisContentManager.ObjectCacheItem objectCacheItem2 = this.mLoadingStack.LastOrDefault<ParisContentManager.ObjectCacheItem>();
-                    if (objectCacheItem2 != null)
-                    {
-                        objectCacheItem2.Children.Add(new WeakReference(objectCacheItem));
-                    }
-                    this.mLoadingStack.Add(objectCacheItem);
-                    objectCacheItem.Parent = new WeakReference(objectCacheItem2);
-                }
-
-                // See this.EnsureLock() notes
-                Monitor.Exit(ParisContentManager.mLock);
-                isLockAcquired = false;
-
-                if (t2 == null)
-                {
-                    t2 = this.LoadFromDLC<T>(i_assetName);
-                }
-                if (t2 == null && typeof(T) == typeof(ReloadableTexture))
-                {
-                    t2 = (T)((object)new ReloadableTexture(i_assetName));
-                }
-                if (t2 == null)
-                {
-                    t2 = (T)((object)this.LoadParisBinary(i_assetName));
-                }
-                if (t2 == null)
-                {
-                    t2 = this.LoadRawData<T>(i_assetName);
-                }
-                if (t2 == null)
-                {
-                    t2 = (T)((object)this.LoadCompressedJson(i_assetName));
-                }
-                if (t2 == null)
-                {
-                    t2 = ContentManager_Load<T>(i_assetName);
-                }
-
-                // See this.EnsureLock() notes
-                this.EnsureLock();
-                isLockAcquired = true;
-                if (objectCacheItem != null && t2 != null && typeof(T) != typeof(GameMenu))
-                {
-                    objectCacheItem.Obj = t2;
-                    objectCacheItem.Children = (
-                        from x in objectCacheItem.Children
-                        where x.IsAlive
-                        select x).ToList<WeakReference>();
-                    this.mloadedAssets.TryAdd(text, objectCacheItem);
-                    objectCacheItem.Time = (double)stopwatch.ElapsedMilliseconds;
-                }
-                result = t2;
-            }
-            finally
-            {
-                // See this.EnsureLock() notes
-                if (isLockAcquired)
-                    Monitor.Exit(ParisContentManager.mLock);
-            }
-            return result;
-        }
-    }
-}
-
-namespace Paris.Engine.Graphics.Playfield
-{
-    class patch_GameObjectLayer: GameObjectLayer
-    {
-        [MonoModLinkTo("Microsoft.Xna.Framework.Content.ContentManager", "Load")]
-        [MonoModForceCall]
-        [MonoModRemove]
-        public extern T ContentManager_Load<T>(string i_assetName);
-
-        static private Type patch_Options_t;
-        static private FieldInfo info;
-
-        new public void Render(float startPriority, float endPriority, Vector2 layerPosRatio)
-		{
-            if (patch_Options_t == null)
-            {
-                patch_Options_t = Type.GetType("Paris.Game.Menu.Options, TMNT", true);
-                info = patch_Options_t.GetField("shadowPreset", BindingFlags.Static | BindingFlags.Public);
-            }
-
-            int shadowPreset = (int)info.GetValue(null);
-
-			//base.Render(startPriority, endPriority, layerPosRatio);
-			this._translucentObjectsToRender.Clear();
-			bool editorMode = ContextManager.Singleton.EditorMode;
-			if ((!ContextManager.Singleton.EditorMode || !base.Hidden) && !ContextManager.Singleton.Serializing)
-			{
-				Renderer singleton = Renderer.Singleton;
-				Vector2 position2D = Scene2d.Active.CurrentCamera.Position2D;
-				Scene2d active = Scene2d.Active;
-				bool is3D = active.Is3D;
-				this._objectsToRender.Clear();
-				for (int i = 0; i < this.GameObject2dList.Count; i++)
-				{
-					GameObject2d gameObject = this.GameObject2dList[i].GameObject;
-					if (gameObject.Active && gameObject.Initialized && this.ShouldRenderGameObject(gameObject, active, startPriority, endPriority))
-					{
-						this._objectsToRender.Add(gameObject);
-					}
-				}
-				EngineSettings singleton2 = EngineSettings.Singleton;
-				float num = is3D ? Renderer.Singleton.PriorityManager.GetRenderPriority(singleton2.ShadowPriority) : 1f;
-				if (is3D)
-				{
-					foreach (GameObject2d gameObject2d in this._objectsToRender)
-					{
-						if (gameObject2d.GetRenderPriority() >= num)
-						{
-							if (gameObject2d.IsTranslucent)
-							{
-								this._translucentObjectsToRender.Add(gameObject2d);
-							}
-							else
-							{
-								gameObject2d.Render();
-							}
-						}
-					}
-					if (!editorMode && this._shadowRenderTarget != null && this.ShadowsEnabled && shadowPreset >= 1)
-					{
-                        Color clearColor = singleton.ClearColor;
-                        if (shadowPreset >= 2)
-                        {
-						    singleton.ClearColor = Color.Transparent;
-						    singleton.Push(true, singleton.CurrentPos, singleton.CurrentViewport, singleton.CurrentScale, singleton.CurrentDepthEnabled, this._shadowRenderTarget, new Matrix?(singleton.CurrentProjection), null);
-                        }
-						foreach (GameObject2d gameObject2d2 in this._objectsToRender)
-						{
-							gameObject2d2.RenderShadow();
-						}
-                        if (shadowPreset >= 2)
-                        {
-                            singleton.Pop();
-                            singleton.ClearColor = clearColor;
-                            Renderer.Singleton.DrawTexture(this._shadowRenderTarget, Vector2.Zero, Vector2.Zero, position2D, Vector2.Zero, Color.White.WithAlpha(singleton2.ShadowOpacity), num);
-                        }
-                    }
-					foreach (GameObject2d gameObject2d3 in this._objectsToRender)
-					{
-						if (editorMode || this._shadowRenderTarget == null)
-						{
-							gameObject2d3.RenderShadow();
-						}
-						gameObject2d3.RenderFlat();
-					}
-				}
-				foreach (GameObject2d gameObject2d4 in this._objectsToRender)
-				{
-					if (!is3D || gameObject2d4.GetRenderPriority() < num)
-					{
-						if (gameObject2d4.IsTranslucent)
-						{
-							this._translucentObjectsToRender.Add(gameObject2d4);
-						}
-						else
-						{
-							gameObject2d4.Render();
-						}
-					}
-				}
-				foreach (GameObject2d gameObject2d5 in this._translucentObjectsToRender)
-				{
-					gameObject2d5.Render();
-				}
-			}
-		}
-    }
 }
 
 namespace Paris.Engine.Audio
@@ -417,6 +208,7 @@ namespace Paris.Engine.Audio
     class patch_AudioManager: AudioManager
     {
         private MemoryMappedFile mMapSFXBank;
+        private MemoryMappedViewStream bankStream; // Losing the ref. to bankStream causes munmap??
 
         // Keep a few resident memory pages per sound effect for hot starting...
         [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
@@ -477,10 +269,12 @@ namespace Paris.Engine.Audio
                         FileMode.Open,
                         Path.Combine("Audio", "SFXPack"),
                         0,
-                        MemoryMappedFileAccess.CopyOnWrite);
+                        MemoryMappedFileAccess.Read);
 
-                    MemoryMappedViewStream bankStream = mMapSFXBank.CreateViewStream();
+                    bankStream = mMapSFXBank.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
+                    IntPtr basePtr = bankStream.SafeMemoryMappedViewHandle.DangerousGetHandle();
                     BinaryReader bankReader = new BinaryReader(bankStream);
+                    
                     for (int i = 0; i < soundSettings.Sounds.Count; i++)
                     {
                         SoundSettings.SoundInfo soundInfo = soundSettings.Sounds[i];
@@ -513,12 +307,10 @@ namespace Paris.Engine.Audio
                             {
                                 // Get pointer to sound effect from the bankStream, can't use bankStream.PositionPointer
                                 // since that causes a runtime error.
-                                byte *basePtr = null;
-                                mMapSFXBank.CreateViewAccessor().SafeMemoryMappedViewHandle.AcquirePointer(ref basePtr);
                                 IntPtr sfxPtr = new IntPtr((Int64)basePtr + bankStream.Position);
 
                                 // Keep a couple pages of audio resident on memory, for hot-starting.
-                                pinSfxPages((byte*)sfxPtr, sndSize);
+                                // pinSfxPages((byte*)sfxPtr, sndSize);
 
                                 // Requires FNA SoundEffect..ctor IntPtr extensions
                                 sfx._soundEffect = new SoundEffect(sfxPtr, false, sndSize, 48000, AudioChannels.Stereo);
@@ -582,4 +374,54 @@ namespace Paris.Engine.Audio
             }
         }
     }
+}
+
+// We don't have Steam present, and we want to be sure users aren't freeloading
+// on DLCs they did not purchase, we'll have to perform some silly heuristics
+// to check.
+namespace Paris.Engine.System.DLC
+{
+    public class patch_DLCInfo: DLCInfo {
+        public bool CheckOwnsShellshock()
+        {
+            // Having the "Aftermath" animation is a good smell to sniff out the
+            // Shellshock DLC ownership status.
+            try {
+                ContextManager.Singleton.LoadContent<AnimatedObject2dData>("2d\\Animations\\BG\\Survival\\Aftermath\\Aftermath", true);
+                State = LockState.Unlocked;
+                return true;
+            } catch (Exception) { }
+
+            return false;
+        }
+
+        public patch_DLCInfo(int id) : base(id) {
+            
+        }
+
+        public extern void orig_SetAppID(uint appid);
+        new public void SetAppID(uint appid)
+        {
+            // AppID = new AppId_t(appid);
+            orig_SetAppID(appid);
+            switch (appid) {
+                case 2348930: //Shellshock
+                    Console.Out.WriteLine($"Owns {appid}? {CheckOwnsShellshock()}");
+                    break;
+                default:
+                    Console.Out.WriteLine($"Unknown DLC {appid}");
+                    break;
+            }
+        }
+
+        new public bool IsInstalled() {
+            CheckOwnsShellshock();
+            return State == LockState.Unlocked;
+        }
+
+        new public void UpdateState()
+        {
+            CheckOwnsShellshock();
+        }
+    };
 }
