@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Chasm;
 using Chasm.Platforms;
+using Chasm.Graphics;
 using Chasm.Menus;
 
 
@@ -141,6 +142,47 @@ public static class ChasmPatches
                 {
                     codes[i] = new CodeInstruction(OpCodes.Newobj, AccessTools.Constructor(typeof(PCPlatform), new Type[] {}));
                     Console.WriteLine($"Patched ChasmGame at ChasmGame:StartupInit+{i}");
+                    break;
+                }
+            }
+            
+            return codes.AsEnumerable();
+        }
+    }
+
+    [HarmonyPatch(typeof(AcheivementMessage), nameof(AcheivementMessage.Draw))]
+    static class AcheivementMessage_Draw
+    {
+        private static bool Prefix(AcheivementMessage __instance)
+        {
+            // Don't draw achievements...
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(MainMenu), nameof(MainMenu.Show))]
+    static class MainMenu_Show
+    {
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            Console.WriteLine($"Patching ChasmGame at MainMenu:Show...");
+            var codes = new List<CodeInstruction>(instructions);
+            for (int i = 0; i < codes.Count-3; i++)
+            {
+                // Disable GOG_Galaxy query, we're logged in to nothing.
+                if (
+                    codes[i].opcode == OpCodes.Ldsfld      && codes[i].operand.ToString().Contains("m_instance") && // 282	0432	ldsfld	class Chasm.Platforms.GOG.GogPlatform Chasm.Platforms.GOG.GogPlatform::m_instance   
+                    codes[i+1].opcode == OpCodes.Ldc_I4_0  &&                                                       // 283	0437	ldc.i4.0  
+                    codes[i+2].opcode == OpCodes.Callvirt  &&                                                       // 284	0438	callvirt	instance bool Chasm.Platforms.GOG.GogPlatform::IsLoggedOn(bool)  
+                    codes[i+3].opcode == OpCodes.Brfalse_S                                                          // 285	043D	brfalse.s	301 (0477) ldarg.0   
+                )
+                {
+                    List<CodeInstruction> newCodes = new List<CodeInstruction>();
+                    var br = (System.Reflection.Emit.Label)codes[i+3].operand;
+                    newCodes.Add(new CodeInstruction(OpCodes.Br_S, br));
+                    codes.RemoveRange(i, 4);
+                    codes.InsertRange(i, newCodes);
+                    Console.WriteLine($"Patched ChasmGame at MainMenu:Show+{i}");
                     break;
                 }
             }
