@@ -21,6 +21,7 @@ public static class ChasmPatches
     public static void Main()
     {
         Console.Out.WriteLine("Found ChasmPatches, running...");
+
         try
         {
             new Harmony("com.github.johnnyonflame.ChasmPatches").PatchAll(Assembly.GetExecutingAssembly());
@@ -32,6 +33,20 @@ public static class ChasmPatches
         }
     }
 
+    [HarmonyPatch(typeof(ChasmGame), nameof(ChasmGame.LoadContent))]
+    static class ChasmGame_LoadContent
+    {
+        public static bool Prefix(ref ChasmGame __instance)
+        {
+            // lambda can't capture ref...
+            ChasmGame game = __instance;
+
+            // We want to change the video mode whenever the resolution has changed!
+            __instance.Window.ClientSizeChanged += (o, a) => game.SetFullScreen();
+            return true;
+        }
+    }
+    
     [HarmonyPatch(typeof(ChasmGame), nameof(ChasmGame.CalculateUpscaleResolution))]
     static class ChasmGame_CalculateUpscaleResolution
     {
@@ -73,6 +88,14 @@ public static class ChasmPatches
         {
             __instance._settingFullscreen = true;
             int num = ConfigReader.ReadInt("Scaling");
+            DisplayMode displayMode = GlobalShare.GraphicsDevice.DisplayMode;
+            if (GlobalShare.Fullscreen)
+            {
+                displayMode = GraphicsAdapter.Adapters[GlobalShare.FullscreenIndex - 1].CurrentDisplayMode;
+            }
+
+            GlobalShare.DeviceResolution = new Point(displayMode.Width, displayMode.Height);
+
             Point deviceResolution = GlobalShare.DeviceResolution;
             if (!GlobalShare.FitToScreen)
             {
