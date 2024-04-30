@@ -297,58 +297,6 @@ public static class SteelAssaultCsPatches
             return true;
         }
     }
-
-    // Don't Lazily JIT methods.
-    [HarmonyPatch(typeof(Level))]
-    [HarmonyPatch(MethodType.Constructor)]
-    [HarmonyPatch(new [] { typeof(Level.Area), typeof(bool) })]
-    public class Level__ctor
-    {
-        static bool isLoaded = false;
-        public static void RecurseTypes(List<Type> objects_jit, Type type)
-        {
-            objects_jit.Add(type);
-            foreach (var t in type.GetNestedTypes())
-            {
-                RecurseTypes(objects_jit, t);
-            }
-        }
-
-        public static void Postfix(Object lvlArea, bool makeObjects)
-        {
-            if (isLoaded)
-                return;
-
-            List<Type> objects_jit = new List<Type>();
-            foreach (var type in Assembly.GetEntryAssembly().GetTypes())
-            {
-                RecurseTypes(objects_jit, type);
-            }
-
-/*
-            Thread jitter = new Thread(() =>
-                {
-*/              objects_jit.AsParallel().ForAll(type =>
-                    {
-                        foreach (var method in type.GetMethods(
-                            BindingFlags.Static |
-                            BindingFlags.Instance |
-                            BindingFlags.Public |
-                            BindingFlags.NonPublic))
-                        {
-                            // System.Console.WriteLine($"JITing {type.ToString()}:{method.Name}...");
-                            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(method.MethodHandle);
-                        }
-                    }
-                );
-/*
-            );
-            jitter.Priority = ThreadPriority.Lowest;
-            jitter.Start();
-*/
-            isLoaded = true;
-        }
-    }
 }
 
 namespace System.Runtime.CompilerServices
