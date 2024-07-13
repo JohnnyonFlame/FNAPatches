@@ -239,9 +239,6 @@ public static class CelestePatches
         }
     }
 
-    // -----------------
-    // Lighting Renderer
-    // -----------------
     [HarmonyPatch(typeof(LightingRenderer), nameof(LightingRenderer.BeforeRender))]
     static class LightingRenderer_BeforeRender
     {
@@ -273,12 +270,11 @@ public static class CelestePatches
             var codes = new List<CodeInstruction>(instructions);
             for (int i = 0; i < codes.Count; i++)
             {
-                if (codes[i].opcode == OpCodes.Call &&
-                    codes[i].operand.ToString().Contains(
-                    "Microsoft.Xna.Framework.Graphics.Texture2D Blur(Microsoft.Xna.Framework.Graphics.Texture2D, Monocle.VirtualRenderTarget, Monocle.VirtualRenderTarget, Single, Boolean, Samples, Single, Direction, Single)"))
+                if (codes[i].opcode == OpCodes.Call && codes[i].operand.ToString().Contains("Texture2D Blur"))
                 {
                     for (int j = 0; j < 11; j++)
                         codes[i-j].opcode = OpCodes.Nop;
+
                     codes[i+1].opcode = OpCodes.Nop;
                     codes[i-10].opcode = OpCodes.Call;
                     codes[i-10].operand = AccessTools.Method(typeof(LightingRenderer_BeforeRender), "ApplyBlurPreset", new Type[] {  });
@@ -351,7 +347,7 @@ public static class CelestePatches
         }
     }
 
-    [HarmonyPatch(typeof(DustEdges), nameof(LightingRenderer.Render))]
+    [HarmonyPatch(typeof(DustEdges), nameof(DustEdges.Render))]
     static class DustEdges_Render
     {
         public static bool Prefix(ref DustEdges __instance)
@@ -382,7 +378,11 @@ public static class CelestePatches
             samples = (GaussianBlur.Samples)Math.Min((int)gaussianBlurPreset - 1, (int)samples);
             if (samples < 0)
             {
-                __result = texture;
+                Engine.Instance.GraphicsDevice.SetRenderTarget(output);
+                if (clear)
+                    Engine.Instance.GraphicsDevice.Clear(Color.Transparent);
+
+                __result = (Texture2D)output;
                 return false;
             }
 
