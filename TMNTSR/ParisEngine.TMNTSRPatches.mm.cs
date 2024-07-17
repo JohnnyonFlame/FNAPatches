@@ -54,15 +54,7 @@ namespace Paris.Engine.Context
                 return;
             }
 
-            AttackList.Load();
-            PowerLevelList.Load();
-            SurvivalDimensionList.Load();
-            SurvivalWaveList.Load();
-            SurvivalPowerLevelList.Load();
-            CharacterManager.Singleton.Init();
-
             // Those can be loaded async, since they have no texture data
-            int i = 0;
             Action[] array = new Action[4] { PreloadAudio, CacheJsonFiles, CacheReflectionInfo, PreloadPoolObjects };
             foreach (Action action in array)
             {
@@ -73,6 +65,14 @@ namespace Paris.Engine.Context
                 mGlobalLoadingThreads.Add(thread);
                 thread.Start();
             }
+
+            // These resources contain texture data, we need to load them synchronously
+            AttackList.Load();
+            PowerLevelList.Load();
+            SurvivalDimensionList.Load();
+            SurvivalWaveList.Load();
+            SurvivalPowerLevelList.Load();
+            CharacterManager.Singleton.Init();
 
             // This has to be loaded by the main thread.
             LoadGlobalContent();
