@@ -39,6 +39,40 @@ namespace Paris.Engine.Save
     }
 }
 
+namespace Paris.Engine.System.AssetPacks
+{
+    // Fix issues with Alt VO fails to be applied on Linux when using the Windows builds
+    public class patch_AssetPack : AssetPack
+    {
+        private void PopulateReplacementCache()
+        {
+            this._contentPathCache.Clear();
+            string sfxFolder = Path.Combine(this.SourcePath, "Audio\\SFX\\");
+            sfxFolder = sfxFolder.Replace("/", "\\");
+            foreach (AssetPackItem assetPackItem in this.Items)
+            {
+                string originalPath = assetPackItem.OriginalPath;
+                string replacementPath = assetPackItem.ReplacementPath;
+                this._contentPathCache[originalPath] = replacementPath;
+                if (originalPath.StartsWith("Audio\\SFX\\"))
+                {
+                    string originalSfxPath = originalPath.Remove(0, "Audio\\SFX\\".Length);
+                    string replacementSfxPath = replacementPath;
+                    if (replacementPath.StartsWith("Audio\\SFX\\"))
+                    {
+                        replacementSfxPath = replacementPath.Remove(0, "Audio\\SFX\\".Length);
+                    }
+                    else if (replacementPath.StartsWith(sfxFolder))
+                    {
+                        replacementSfxPath = replacementPath.Remove(0, sfxFolder.Length);
+                    }
+                    this._sfxPathCache[originalSfxPath] = replacementSfxPath;
+                }
+            }
+        }
+    }
+}
+
 namespace Paris.Engine.Context
 {
     public class patch_ContextManager: ContextManager
@@ -205,156 +239,137 @@ namespace Paris.Engine {
 
 namespace Paris.Engine.Audio
 {
-    class patch_AudioManager: AudioManager
-    {
-        private MemoryMappedFile mMapSFXBank;
-        private MemoryMappedViewStream bankStream; // Losing the ref. to bankStream causes munmap??
+    public class MMappedSFXBank {
+        public string assetPath;
+        public MemoryMappedFile mmapFile;
+        public MemoryMappedViewStream mvStream;
+        public IntPtr basePtr;
 
-        // Keep a few resident memory pages per sound effect for hot starting...
-        [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
-        private static unsafe void pinSfxPages(byte *ptr, int size)
+        public MMappedSFXBank(string assetPath)
         {
-            long nPages = Math.Max(1, 32768 / Environment.SystemPageSize);
-            long curPtr = (Int64)ptr;
-            long limit = ((Int64)ptr + size);
-
-            for (int i = 0; i < nPages; i++)
-            {
-                if (curPtr >= limit)
-                    break;
-                
-                byte *xored = (byte*)curPtr;
-                *xored ^= 0x33;
-                *xored ^= 0x33;
-                curPtr += Environment.SystemPageSize;
-            }
+            this.assetPath = assetPath;
+            mmapFile = MemoryMappedFile.CreateFromFile(assetPath, FileMode.Open, assetPath, 0, MemoryMappedFileAccess.Read);
+            mvStream = mmapFile.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
+            basePtr = mvStream.SafeMemoryMappedViewHandle.DangerousGetHandle();
         }
 
-        // This patch implements Memory Mapped SFX support, SFXPack.pbn is a 300mb file that gets loaded in it's entirety
-        // to ram, this patch allows said file to remain resident in virtual memory as a memory mapped file, but not take
-        // so much physical memory. 
-        new unsafe public virtual void Init()
+        public void RewindStream()
         {
-            // Just standard AudioManager.Init()...
-            if (!this._initialized && !AudioManager.NoSound)
-            {
-                SoundSettings soundSettings = ContextManager.Singleton.LoadContent<SoundSettings>(EngineSettings.Singleton.SoundsSettings, true, false);
-                float num = soundSettings.Settings.MasterVolume / 100f;
-                this._masterMusicVolume = num * (soundSettings.Settings.MasterMusicVolume / 100f);
-                this._masterSFXVolume = num * (soundSettings.Settings.MasterSoundVolume / 100f);
-                this.CurrentMusicName = "";
-                foreach (SoundSettings.SoundChannel soundChannel in soundSettings.Channels)
-                {
-                    this._soundChannels.Add(new SFXChannel(soundChannel.Name, soundChannel.MaxSounds, soundChannel.Volume, soundChannel.PlayType));
-                }
-                string path = string.Empty;
-                if (ParisContentManager.RawDataMode)
-                {
-                    path = Path.Combine(ContextManager.Singleton.GlobalContentManager.RootDirectory, "Audio", "SFXPack.pbn");
-                }
-                else
-                {
-                    path = ContextManager.Singleton.GlobalContentManager.GetFilePath(Path.Combine("Audio", "SFXPack")) + ".pbn";
-                }
-                if (File.Exists(path) && !this.EditorMode)
-                {
-                    // Here's where we differ, we're going to Memory Map the SFX Bank instead of
-                    // straight up loading it and keeping it always resident on physical ram.
-                    // This is 300mb+ of RAM we're not wasting for the price of possibly running
-                    // into pagefaults every now and then.
-                    // Still better than swap, by a mile. This helps save the game from stuttering
-                    // limbo on memory starved devices. (e.g. 1GByte shared ram)
-                    mMapSFXBank = MemoryMappedFile.CreateFromFile(
-                        path,
-                        FileMode.Open,
-                        Path.Combine("Audio", "SFXPack"),
-                        0,
-                        MemoryMappedFileAccess.Read);
+            mvStream.Seek(0, SeekOrigin.Begin);
+        }
+    };
 
-                    bankStream = mMapSFXBank.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
-                    IntPtr basePtr = bankStream.SafeMemoryMappedViewHandle.DangerousGetHandle();
-                    BinaryReader bankReader = new BinaryReader(bankStream);
-                    
-                    for (int i = 0; i < soundSettings.Sounds.Count; i++)
-                    {
-                        SoundSettings.SoundInfo soundInfo = soundSettings.Sounds[i];
-                        try
-                        {
-                            int sndSize = bankReader.ReadInt32();
-                            if (sndSize < 0)
-                                throw new Exception("sndSize < 0");
-                            
-                            // Use the simplified constructor so we can poke directly at the fields and instanciate
-                            // a memory mapped version instead.
-                            SFX sfx = new SFX(soundInfo.SoundID, soundInfo.Cooldown);
-                            Console.Out.WriteLine($"Instanciating \"{soundInfo.SoundID}\" SFX ({sndSize} bytes)");
-
-                            List<SFXChannel> list = (
-                                from channelName in soundInfo.PlaybackChannels
-                                from sfxChannel  in this._soundChannels where sfxChannel.Name == channelName
-                                select sfxChannel
-                                ).ToList();
+    class patch_AudioManager: AudioManager
+    {
+        public static List<MMappedSFXBank> loadedBanks = new List<MMappedSFXBank>{};
 
                             /* 
                                 Replacement for SFX..ctor "public SFX(string assetName, byte[] data, float volume,
                                     int poolSize, SoundLoopType loopType, SFXChannel[] channels, SoundCutOffType cutOffType, 
                                     Range randomPitch, bool isVO, float cooldown) : this(assetName, cooldown)"
-
-                                We're doing this instead of providing an extended version for simplicity's sake.
-                            */
-
-                            try
-                            {
-                                // Get pointer to sound effect from the bankStream, can't use bankStream.PositionPointer
-                                // since that causes a runtime error.
-                                IntPtr sfxPtr = new IntPtr((Int64)basePtr + bankStream.Position);
-
-                                // Keep a couple pages of audio resident on memory, for hot-starting.
-                                // pinSfxPages((byte*)sfxPtr, sndSize);
-
-                                // Requires FNA SoundEffect..ctor IntPtr extensions
-                                sfx._soundEffect = new SoundEffect(sfxPtr, false, sndSize, 48000, AudioChannels.Stereo);
+        */
+        public static SFX SFXFromIntPtr(string assetName, IntPtr data, int length, float volume, int poolSize, SoundLoopType loopType, SFXChannel[] channels, SoundCutOffType cutOffType, Types.Range randomPitch, bool isVO, float cooldown)
+        {
+            SFX sfx = new SFX(assetName, cooldown);
+            sfx._soundEffectInstance = new SoundEffectInstance[poolSize];
+			try
+			{
+				sfx._soundEffect = new SoundEffect(data, false, length, 48000, AudioChannels.Stereo);
                             }
-                            catch (Exception ex)
+			catch (Exception)
                             {
-                                Console.Out.WriteLine($"Failed to load {soundInfo.SoundID}, {ex.ToString()}");
                                 sfx._soundEffect = null;
                             }
-                            
-                            // Standard SFX constructor affair...
-                            var randomPitch = new Types.Range(soundInfo.PitchMin, soundInfo.PitchMax);
-                            sfx._playVolume = soundInfo.Volume / 100f;
-                            sfx.IsVO = soundInfo.IsVO;
-                            int numLoop = (soundInfo.LoopType == SoundLoopType.NoLoop) ? soundInfo.PoolSize : 1;
-                            sfx._soundEffectInstance = new SoundEffectInstance[numLoop];
-
-                            for (int j = 0; j < numLoop; j++)
+			sfx._playVolume = volume;
+			sfx.IsVO = isVO;
+			int finalPoolSize = (loopType == SoundLoopType.NoLoop) ? poolSize : 1;
+			for (int i = 0; i < finalPoolSize; i++)
                             {
                                 if (sfx._soundEffect != null)
                                 {
-                                    sfx._soundEffectInstance[j] = sfx._soundEffect.CreateInstance();
-                                    sfx._soundEffectInstance[j].IsLooped = (soundInfo.LoopType > SoundLoopType.NoLoop);
+					sfx._soundEffectInstance[i] = sfx._soundEffect.CreateInstance();
+					sfx._soundEffectInstance[i].IsLooped = (loopType > SoundLoopType.NoLoop);
                                 }
                             }
-
-                            sfx._channels = list.ToArray();
-                            sfx._cutOffType = soundInfo.CutOffType;
-                            sfx._loopType = soundInfo.LoopType;
+			sfx._channels = channels;
+			sfx._cutOffType = cutOffType;
+			sfx._loopType = loopType;
                             if (randomPitch.Min != 0f || randomPitch.Max != 0f)
                             {
                                 sfx._pitch = new Types.Range?(randomPitch);
                             }
                             sfx.Volume = 1f;
+            return sfx;
+        }
 
-                            /* SFX..ctor Replacement done */
-                            bankStream.Seek(sndSize, SeekOrigin.Current);
-                            this._sounds.Add(sfx);
+        /*
+          This patch implements Memory Mapped SFX support, SFXPack.pbn is a 300mb file that gets loaded
+          in it's entirety to ram, this patch allows said file to remain resident in virtual memory as a
+          memory mapped file, while not taking as much physical memory. 
+        */
+        new unsafe public void LoadSFXPack(List<SFX> sounds, string packPath, AssetPackEnableFlags flags)
+        {
+            try
+            {
+                // Memory map the Voice Bank or reuse an already mapped one
+                MMappedSFXBank bank = loadedBanks.Find(b => b.assetPath == packPath);
+                if (bank == null)
+                {
+                    bank = new MMappedSFXBank(packPath);
+                    loadedBanks.Add(bank);
+                }
+                else
+                {
+                    bank.RewindStream();
+                }
+    
+                BinaryReader bankReader = new BinaryReader(bank.mvStream);
+
+                foreach (SoundSettings.SoundInfo soundInfo in this._settings.Sounds)
+                {
+                    int sndSize = bankReader.ReadInt32();
+                    if (sndSize < 0)
+                        throw new Exception("sndSize < 0");
+
+                    if (sndSize > 0)
+                    {
+                        // We'd usually read the entire sound effect into memory, here we just take the offset
+                        // then we move the reading head forwards.
+                        long offset = bank.mvStream.Position;
+                        bank.mvStream.Seek(sndSize, SeekOrigin.Current);
+
+                        IEnumerable<SFXChannel> channels = (
+                            from channelName in soundInfo.PlaybackChannels
+                            from sfxChannel  in this._soundChannels
+                            where sfxChannel.Name == channelName
+                            select sfxChannel
+                        );
+
+                        if ((((flags & AssetPackEnableFlags.Voice) != (AssetPackEnableFlags)0) || !soundInfo.IsVO) &&
+                            (((flags & AssetPackEnableFlags.Sound) != (AssetPackEnableFlags)0) ||  soundInfo.IsVO))
+                        {
+                            IntPtr sfxPtr = new IntPtr((Int64)bank.basePtr + offset);
+                            sounds.Add(SFXFromIntPtr(
+                                soundInfo.SoundID,
+                                sfxPtr,
+                                sndSize,
+                                soundInfo.Volume / 100f,
+                                soundInfo.PoolSize,
+                                soundInfo.LoopType,
+                                Enumerable.ToArray(channels),
+                                soundInfo.CutOffType,
+                                new Types.Range(soundInfo.PitchMin, soundInfo.PitchMax),
+                                soundInfo.IsVO,
+                                soundInfo.Cooldown));
                         }
+                    }
+                }
+            }
                         catch (Exception ex)
                         {
                             Console.Out.WriteLine("Invalid data being read in SFXPack using list of sounds from SoundsSettings; SoundsSettings & SFXPack are out of sync! Error message: " + ex.ToString());
-                            this._sounds.Clear();
-                            break;
+                sounds.Clear();
+            }
                         }
                     }
                 }
