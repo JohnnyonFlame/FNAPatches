@@ -1,25 +1,22 @@
 using Microsoft.Xna.Framework.Audio;
-using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 using MonoMod;
-using Paris.Engine.Graphics.Animations;
 using Paris.Engine.Context;
-using Paris.Engine.Data;
+using Paris.Engine.Graphics.Animations;
 using Paris.Engine.Graphics;
-using Paris.Engine.Scene;
-using Paris.Engine.System;
-using Paris.Engine;
-using Paris.System.Helper;
-using Paris.Game.System;
-using Paris.Game.System.Progression;
+using Paris.Engine.System.AssetPacks;
 using Paris.Engine.System.Helper;
+using Paris.Engine.System.Leaderboards;
+using Paris.Engine.System.Localisation;
+using Paris.Engine.System;
+using Paris.System.Helper;
+using Paris.Game.System.Progression;
+using Paris.Game.System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System;
 
@@ -122,7 +119,7 @@ namespace Paris.Engine.Context
                 }
             }
 
-            _preloadingState |= PreloadingState.CustomPreloaders;
+            _preloadingState = PreloadingState.Finished;
         }
     }
 }
@@ -201,16 +198,6 @@ namespace Paris.Engine {
             }
 
             this.currentlyUpdatingComponents.Clear();
-#if false
-            elapsedAccum += gameTime.ElapsedGameTime.TotalSeconds;
-            elapsedCounter += 1;
-            if (elapsedCounter % bufferFrames == 0)
-            {
-                double deltaTimeAvg = (elapsedAccum * 1000.0f) / (float)bufferFrames;
-                Console.Out.WriteLine($"{deltaTimeAvg}ms {1000.0f / deltaTimeAvg}fps");
-                elapsedAccum = 0.0f;
-            }
-#endif
             base.IsFixedTimeStep = !Renderer.Singleton.VSync;
         }
     }
@@ -262,11 +249,11 @@ namespace Paris.Engine.Audio
     class patch_AudioManager: AudioManager
     {
         public static List<MMappedSFXBank> loadedBanks = new List<MMappedSFXBank>{};
-
-                            /* 
-                                Replacement for SFX..ctor "public SFX(string assetName, byte[] data, float volume,
-                                    int poolSize, SoundLoopType loopType, SFXChannel[] channels, SoundCutOffType cutOffType, 
-                                    Range randomPitch, bool isVO, float cooldown) : this(assetName, cooldown)"
+        
+        /* 
+            Replacement for SFX..ctor "public SFX(string assetName, byte[] data, float volume,
+                int poolSize, SoundLoopType loopType, SFXChannel[] channels, SoundCutOffType cutOffType, 
+                Range randomPitch, bool isVO, float cooldown) : this(assetName, cooldown)"
         */
         public static SFX SFXFromIntPtr(string assetName, IntPtr data, int length, float volume, int poolSize, SoundLoopType loopType, SFXChannel[] channels, SoundCutOffType cutOffType, Types.Range randomPitch, bool isVO, float cooldown)
         {
@@ -275,30 +262,30 @@ namespace Paris.Engine.Audio
 			try
 			{
 				sfx._soundEffect = new SoundEffect(data, false, length, 48000, AudioChannels.Stereo);
-                            }
+			}
 			catch (Exception)
-                            {
-                                sfx._soundEffect = null;
-                            }
+			{
+				sfx._soundEffect = null;
+			}
 			sfx._playVolume = volume;
 			sfx.IsVO = isVO;
 			int finalPoolSize = (loopType == SoundLoopType.NoLoop) ? poolSize : 1;
 			for (int i = 0; i < finalPoolSize; i++)
-                            {
-                                if (sfx._soundEffect != null)
-                                {
+			{
+				if (sfx._soundEffect != null)
+				{
 					sfx._soundEffectInstance[i] = sfx._soundEffect.CreateInstance();
 					sfx._soundEffectInstance[i].IsLooped = (loopType > SoundLoopType.NoLoop);
-                                }
-                            }
+				}
+			}
 			sfx._channels = channels;
 			sfx._cutOffType = cutOffType;
 			sfx._loopType = loopType;
-                            if (randomPitch.Min != 0f || randomPitch.Max != 0f)
-                            {
-                                sfx._pitch = new Types.Range?(randomPitch);
-                            }
-                            sfx.Volume = 1f;
+			if (randomPitch.Min != 0f || randomPitch.Max != 0f)
+			{
+				sfx._pitch = new Types.Range?(randomPitch);
+			}
+			sfx.Volume = 1f;
             return sfx;
         }
 
@@ -365,29 +352,22 @@ namespace Paris.Engine.Audio
                     }
                 }
             }
-                        catch (Exception ex)
-                        {
-                            Console.Out.WriteLine("Invalid data being read in SFXPack using list of sounds from SoundsSettings; SoundsSettings & SFXPack are out of sync! Error message: " + ex.ToString());
+            catch (Exception ex)
+            {
+                Console.Out.WriteLine("Invalid data being read in SFXPack using list of sounds from SoundsSettings; SoundsSettings & SFXPack are out of sync! Error message: " + ex.ToString());
                 sounds.Clear();
             }
-                        }
-                    }
-                }
-                if (this._voiceChat != null)
-                {
-                    this._voiceChat.Play();
-                }
-                for (int k = 0; k < this._voiceBuffer.Length; k++)
-                {
-                    this._voiceBuffer[k] = 0;
-                }
-                for (int l = 0; l < EngineSettings.Singleton.MaxPlayers; l++)
-                {
-                    this._voicePlayerMuted[l] = false;
-                }
-                this._initialized = true;
-            }
         }
+    }
+}
+
+// Disable the Leaderboards, we're offline.
+[MonoModPatch("Paris.Engine.System.Leaderboards.Leaderboard")]
+public class patch_Leaderboard
+{
+    [MonoModConstructor]
+    public patch_Leaderboard(LocID name, string key, LeaderboardBase.SortMode sortMode, LeaderboardBase.DisplayType displayType)
+    {
     }
 }
 

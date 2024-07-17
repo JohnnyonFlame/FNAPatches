@@ -1,21 +1,23 @@
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
-using Paris.Engine.Menu.Control;
-using Paris.Engine.Scene;
-using Paris.Engine.Graphics;
+using Microsoft.Xna.Framework;
+using MonoMod;
 using Paris.Engine.Audio;
+using Paris.Engine.Context;
 using Paris.Engine.Cutscenes;
+using Paris.Engine.Graphics;
+using Paris.Engine.Menu.Control;
 using Paris.Engine.Save;
-using Paris.Game.Data;
-using Paris.System.Input;
+using Paris.Engine.Scene;
+using Paris.Engine.System.Networking;
 using Paris.Engine;
+using Paris.Game.Data;
 using Paris.Game.System.Pathfinding;
 using Paris.Game;
+using Paris.System.Input;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System;
-using MonoMod;
 
 #pragma warning disable 1591
 #pragma warning disable CS0649
@@ -183,7 +185,7 @@ namespace Paris
     {
         protected override void Uninit()
 		{
-			base.Uninit();
+			//base.Uninit();
 			GameInfo.Singleton.Uninit();
 			NetworkMessageSystem.Singleton.Uninit();
 			this.UninitLeaderboards();
@@ -191,6 +193,34 @@ namespace Paris
             if (PathfindingManager.Singleton != null)
 			    PathfindingManager.Singleton.Uninit();
 		}
+
+        // Ensure the dispose method doesn't hang the application...
+        protected override void Dispose(bool disposing)
+        {
+            if (!base._disposed)
+			{
+				base._disposed = true;
+				if (AudioManager.Singleton != null)
+				{
+					AudioManager.Singleton.Dispose();
+				}
+				if (ContextManager.Singleton != null)
+				{
+					ContextManager.Singleton.Uninit();
+				}
+				if (NetworkManagerBase.Singleton != null)
+				{
+					NetworkManagerBase.Singleton.Dispose();
+				}
+			}
+        }
+
+        // Don't tick the Leaderboard, we no longer have it.
+        private void UpdatePlatform(float deltaTime)
+        {
+            base.InitControllers();
+            base.UpdateFullScreenToggle();
+        }
     }
 
     static class patch_ParamManager
