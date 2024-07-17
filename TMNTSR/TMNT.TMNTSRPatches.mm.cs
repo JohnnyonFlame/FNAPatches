@@ -132,21 +132,21 @@ namespace Paris.Game.Menu
         }
 
         private Control.OptionSelectionItem InsertOptionsItemString(SelectionMenuControl selectionControl, string option)
-		{
-			int count = selectionControl.Items.Count;
-			return (Control.OptionSelectionItem)selectionControl.Add(new Control.OptionSelectionItem(option, 340)
-			{
-				UnselectedFont = MainMenu.MENU_UNSELECTED_FONT,
-				DisabledFont = MainMenu.MENU_DISABLED_FONT,
-				ArrowLeftTexture = this._arrowLeftTexture,
-				ArrowRightTexture = this._arrowRightTexture,
-				ArrowLeftColor = GameColors.ArrowLeftColor,
-				ArrowRightColor = GameColors.ArrowRightColor,
-				OutlineSelectedColor = Color.Black,
-				OutlineUnselectedColor = Color.Black,
-				OutlineDisabledColor = Color.Black
-			}, 0);
-		}
+        {
+            int count = selectionControl.Items.Count;
+            return (Control.OptionSelectionItem)selectionControl.Add(new Control.OptionSelectionItem(option, 340)
+            {
+                UnselectedFont = MainMenu.MENU_UNSELECTED_FONT,
+                DisabledFont = MainMenu.MENU_DISABLED_FONT,
+                ArrowLeftTexture = this._arrowLeftTexture,
+                ArrowRightTexture = this._arrowRightTexture,
+                ArrowLeftColor = GameColors.ArrowLeftColor,
+                ArrowRightColor = GameColors.ArrowRightColor,
+                OutlineSelectedColor = Color.Black,
+                OutlineUnselectedColor = Color.Black,
+                OutlineDisabledColor = Color.Black
+            }, 0);
+        }
 
         extern void orig_SetupOptions(Options.MenuSchemes menuScheme, SelectionMenuControl selectionControl);
         new public void SetupOptions(Options.MenuSchemes menuScheme, SelectionMenuControl selectionControl)
@@ -184,35 +184,35 @@ namespace Paris
     class patch_Paris: Paris
     {
         protected override void Uninit()
-		{
-			//base.Uninit();
-			GameInfo.Singleton.Uninit();
-			NetworkMessageSystem.Singleton.Uninit();
-			this.UninitLeaderboards();
-			this.UninitPlatform();
+        {
+            //base.Uninit();
+            GameInfo.Singleton.Uninit();
+            NetworkMessageSystem.Singleton.Uninit();
+            this.UninitLeaderboards();
+            this.UninitPlatform();
             if (PathfindingManager.Singleton != null)
-			    PathfindingManager.Singleton.Uninit();
-		}
+                PathfindingManager.Singleton.Uninit();
+        }
 
         // Ensure the dispose method doesn't hang the application...
         protected override void Dispose(bool disposing)
         {
             if (!base._disposed)
-			{
-				base._disposed = true;
-				if (AudioManager.Singleton != null)
-				{
-					AudioManager.Singleton.Dispose();
-				}
-				if (ContextManager.Singleton != null)
-				{
-					ContextManager.Singleton.Uninit();
-				}
-				if (NetworkManagerBase.Singleton != null)
-				{
-					NetworkManagerBase.Singleton.Dispose();
-				}
-			}
+            {
+                base._disposed = true;
+                if (AudioManager.Singleton != null)
+                {
+                    AudioManager.Singleton.Dispose();
+                }
+                if (ContextManager.Singleton != null)
+                {
+                    ContextManager.Singleton.Uninit();
+                }
+                if (NetworkManagerBase.Singleton != null)
+                {
+                    NetworkManagerBase.Singleton.Dispose();
+                }
+            }
         }
 
         // Don't tick the Leaderboard, we no longer have it.
@@ -262,22 +262,22 @@ namespace Paris.Game.Actor
 {
     public class patch_RatKing: RatKing
     {
-		private void SpawnPiedPiperRatsAtPos(Vector3 position, int count, bool horizontalFlipped)
-		{
+        private void SpawnPiedPiperRatsAtPos(Vector3 position, int count, bool horizontalFlipped)
+        {
             int reducedRats = 1 + Menu.patch_Options.reducedRats;
-			for (int i = 0; i < count; i += reducedRats)
-			{
-				Rat rat = GameObjectPoolManager.Singleton.SpawnObject(this.RatPiedPiperTemplatePath, position, false, false, true) as Rat;
-				rat.Owner = this;
-				rat.HorizontalFlipped = horizontalFlipped;
-				rat.SetupRatInStampede();
-				rat.Position += new Vector3(0f, ((float)i - (float)count / 2f) * 10f, 0f);
-				rat.Position += new Vector3(((float)ParisMath.GetRandom() * 10f - 5f) * reducedRats, ((float)ParisMath.GetRandom() * 10f - 5f) * reducedRats, 0f);
-				rat.Animator.CurrentFrameID = ParisMath.GetRandomInt() % rat.Animator.CurrentAnimation.Frames.Count;
-				rat.Animator.Scale = 1f + ((float)ParisMath.GetRandom() - 0.5f) * 0.1f;
-				rat.LocallyControlled = true;
-				this._piedPiperRats.Add(rat);
-			}
-		}
+            for (int i = 0; i < count; i += reducedRats)
+            {
+                Rat rat = GameObjectPoolManager.Singleton.SpawnObject(this.RatPiedPiperTemplatePath, position, false, false, true) as Rat;
+                rat.Owner = this;
+                rat.HorizontalFlipped = horizontalFlipped;
+                rat.SetupRatInStampede();
+                rat.Position += new Vector3(0f, ((float)i - (float)count / 2f) * 10f, 0f);
+                rat.Position += new Vector3(((float)ParisMath.GetRandom() * 10f - 5f) * reducedRats, ((float)ParisMath.GetRandom() * 10f - 5f) * reducedRats, 0f);
+                rat.Animator.CurrentFrameID = ParisMath.GetRandomInt() % rat.Animator.CurrentAnimation.Frames.Count;
+                rat.Animator.Scale = 1f + ((float)ParisMath.GetRandom() - 0.5f) * 0.1f;
+                rat.LocallyControlled = true;
+                this._piedPiperRats.Add(rat);
+            }
+        }
     }
 }

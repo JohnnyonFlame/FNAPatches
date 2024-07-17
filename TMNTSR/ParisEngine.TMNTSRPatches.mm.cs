@@ -259,40 +259,40 @@ namespace Paris.Engine.Audio
         {
             SFX sfx = new SFX(assetName, cooldown);
             sfx._soundEffectInstance = new SoundEffectInstance[poolSize];
-			try
-			{
-				sfx._soundEffect = new SoundEffect(data, false, length, 48000, AudioChannels.Stereo);
-			}
-			catch (Exception)
-			{
-				sfx._soundEffect = null;
-			}
-			sfx._playVolume = volume;
-			sfx.IsVO = isVO;
-			int finalPoolSize = (loopType == SoundLoopType.NoLoop) ? poolSize : 1;
-			for (int i = 0; i < finalPoolSize; i++)
-			{
-				if (sfx._soundEffect != null)
-				{
-					sfx._soundEffectInstance[i] = sfx._soundEffect.CreateInstance();
-					sfx._soundEffectInstance[i].IsLooped = (loopType > SoundLoopType.NoLoop);
-				}
-			}
-			sfx._channels = channels;
-			sfx._cutOffType = cutOffType;
-			sfx._loopType = loopType;
-			if (randomPitch.Min != 0f || randomPitch.Max != 0f)
-			{
-				sfx._pitch = new Types.Range?(randomPitch);
-			}
-			sfx.Volume = 1f;
+            try
+            {
+                sfx._soundEffect = new SoundEffect(data, false, length, 48000, AudioChannels.Stereo);
+            }
+            catch (Exception)
+            {
+                sfx._soundEffect = null;
+            }
+            sfx._playVolume = volume;
+            sfx.IsVO = isVO;
+            int finalPoolSize = (loopType == SoundLoopType.NoLoop) ? poolSize : 1;
+            for (int i = 0; i < finalPoolSize; i++)
+            {
+                if (sfx._soundEffect != null)
+                {
+                    sfx._soundEffectInstance[i] = sfx._soundEffect.CreateInstance();
+                    sfx._soundEffectInstance[i].IsLooped = (loopType > SoundLoopType.NoLoop);
+                }
+            }
+            sfx._channels = channels;
+            sfx._cutOffType = cutOffType;
+            sfx._loopType = loopType;
+            if (randomPitch.Min != 0f || randomPitch.Max != 0f)
+            {
+                sfx._pitch = new Types.Range?(randomPitch);
+            }
+            sfx.Volume = 1f;
             return sfx;
         }
 
         /*
-          This patch implements Memory Mapped SFX support, SFXPack.pbn is a 300mb file that gets loaded
-          in it's entirety to ram, this patch allows said file to remain resident in virtual memory as a
-          memory mapped file, while not taking as much physical memory. 
+        This patch implements Memory Mapped SFX support, SFXPack.pbn is a 300mb file that gets loaded
+        in it's entirety to ram, this patch allows said file to remain resident in virtual memory as a
+        memory mapped file, while not taking as much physical memory. 
         */
         new unsafe public void LoadSFXPack(List<SFX> sounds, string packPath, AssetPackEnableFlags flags)
         {
