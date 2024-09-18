@@ -1,6 +1,6 @@
-texture SampleTexture : register(t0);
-sampler2D SampleTextureSampler = sampler_state {
-	Texture = (SampleTexture);
+texture LightTexture : register(t0);
+sampler2D LightTextureSampler = sampler_state {
+	Texture = (LightTexture);
 	MagFilter = Linear;
 	MinFilter = Linear;
 	AddressU = Clamp;
@@ -27,7 +27,7 @@ float lightFac = 1.0f;
 
 float4 LightMap(float2 texCoord : TEXCOORD0) : COLOR0
 {	
-	float4 col = tex2D(SampleTextureSampler, texCoord);
+	float4 col = tex2D(LightTextureSampler, texCoord);
 	
 	float aFac = col.r;
 	// if (aFac > 0.5f)
