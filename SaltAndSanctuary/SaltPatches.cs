@@ -143,10 +143,67 @@ public static class SaltPatches
 			return 0.45f + VideoOptions__ctor.zoomLevel * 0.05f;
 		}
 
+		public static float GetArenaCorrection()
+		{
+			float origAspect = 1280f / 720f; //16:9
+			float curAspect = ScrollManager.screenSize.X / ScrollManager.screenSize.Y;
+			float correction = origAspect / curAspect;
+			return correction / GetZoomLevelModifier();
+		}
+
 		static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
 		{
 			Console.WriteLine($"Patching CamMgr at CamMgr:Update...");
 			var codes = new List<CodeInstruction>(instructions);
+			for (int i = 0; i < codes.Count-5; i++)
+			{
+				// Changes:
+				// Vector2 arenaLoc = MapMgr.map.triggerMgr.GetArenaLoc(activeArenaIdx);
+				// Vector2 arenaScale = MapMgr.map.triggerMgr.GetArenaScale(activeArenaIdx);
+				// - arenaScale.X -= 500f;
+				// + arenaScale.X -= 500f * GetArenaCorrection();
+				// arenaScale.Y -= 100f;
+				if (
+					codes[i].opcode   == OpCodes.Ldloca_S &&
+					codes[i+1].opcode == OpCodes.Ldflda && codes[i+1].operand.ToString().Contains("X") &&
+					codes[i+2].opcode == OpCodes.Dup &&
+					codes[i+3].opcode == OpCodes.Ldind_R4 &&
+					codes[i+4].opcode == OpCodes.Ldc_R4 &&
+					codes[i+5].opcode == OpCodes.Sub &&
+					codes[i+6].opcode == OpCodes.Stind_R4
+				)
+				{
+					List<CodeInstruction> newCodes = new List<CodeInstruction>();
+					newCodes.Add(new CodeInstruction(OpCodes.Call, ((Func<float>) CamMgr_Update.GetArenaCorrection).Method));
+					newCodes.Add(new CodeInstruction(OpCodes.Div));
+					Console.WriteLine($"[aspect 1/2] Patched CamMgr at CamMgr:Update+{i+3}!");
+					codes.InsertRange(i+5, newCodes);
+					break;
+				}
+			}
+
+			for (int i = 0; i < codes.Count-5; i++)
+			{
+				// Changes:
+				// Vector2 loc = MapMgr.sanctuaryMgr.sanctuaries[sanctuaryIn].loc;
+				// Vector2 vector8 = new Vector2(400f * GetArenaCorrection(), 0f);
+				if (
+					codes[i].opcode   == OpCodes.Ldloca_S &&
+					codes[i+1].opcode == OpCodes.Ldc_R4 &&
+					codes[i+2].opcode == OpCodes.Ldc_R4 &&
+					codes[i+3].opcode == OpCodes.Call && codes[i+3].operand.ToString().Contains(".ctor") &&
+					codes[i+4].opcode == OpCodes.Ldarg_0
+				)
+				{
+					List<CodeInstruction> newCodes = new List<CodeInstruction>();
+					newCodes.Add(new CodeInstruction(OpCodes.Call, ((Func<float>) CamMgr_Update.GetArenaCorrection).Method));
+					newCodes.Add(new CodeInstruction(OpCodes.Mul));
+					Console.WriteLine($"[aspect 2/2] Patched CamMgr at CamMgr:Update+{i+3}!");
+					codes.InsertRange(i+2, newCodes);
+					break;
+				}
+			}
+
 			for (int i = 0; i < codes.Count-5; i++)
 			{
 				// Changes:
