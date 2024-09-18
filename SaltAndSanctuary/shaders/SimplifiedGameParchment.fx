@@ -1,7 +1,14 @@
 // gameparch.fx
 // XNA
 
-sampler samplerState;
+texture SampleTexture : register(t0);
+sampler2D t0_sampler = sampler_state {
+	Texture = (SampleTexture);
+	MagFilter = Linear;
+	MinFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
 
 float baseFac = 1.0f;
 float parchFac = 1.0f;
@@ -43,10 +50,10 @@ float4 Parchment(PS_INPUT Input) : COLOR0
 	float2 coef = float2(ceil(frame) - frame, frame - floor(frame));
 #if USE_GRAIN == 2
 	// Fetch the textures
-	float r = tex2D(samplerState, f_tex.xy).r * (coef.x) +
-	          tex2D(samplerState, f_tex.zw).r * (coef.y);
+	float r = tex2D(t0_sampler, f_tex.xy).r * (coef.x) +
+	          tex2D(t0_sampler, f_tex.zw).r * (coef.y);
 #else // USE_GRAIN == 2
-	float r = tex2D(samplerState, f_tex.xy).r * (coef.x + coef.y);
+	float r = tex2D(t0_sampler, f_tex.xy).r * (coef.x + coef.y);
 #endif // USE_GRAIN == 2
 #else // USE_GRAIN > 0
 	float2 coef = float2(ceil(frame) - frame, frame - floor(frame));

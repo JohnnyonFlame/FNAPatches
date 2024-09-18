@@ -1,5 +1,20 @@
-sampler lightTex;
-sampler cloudsTex;
+texture SampleTexture : register(t0);
+sampler2D SampleTextureSampler = sampler_state {
+	Texture = (SampleTexture);
+	MagFilter = Linear;
+	MinFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
+
+texture CloudsTexture : register(t1);
+sampler2D CloudsTextureSampler = sampler_state {
+	Texture = (CloudsTexture);
+	MagFilter = Linear;
+	MinFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
 
 float2 scroll = { 0.0f, 0.0f };
 float2 scroll2 = { 0.0f, 0.0f };
@@ -12,7 +27,7 @@ float lightFac = 1.0f;
 
 float4 LightMap(float2 texCoord : TEXCOORD0) : COLOR0
 {	
-	float4 col = tex2D(lightTex, texCoord);
+	float4 col = tex2D(SampleTextureSampler, texCoord);
 	
 	float aFac = col.r;
 	// if (aFac > 0.5f)

@@ -1,7 +1,14 @@
 // parchment.fx
 // XNA
 
-sampler samplerState;
+texture SampleTexture : register(t0);
+sampler2D t0_sampler = sampler_state {
+	Texture = (SampleTexture);
+	MagFilter = Linear;
+	MinFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
 
 float pX;
 float pY;
@@ -23,7 +30,7 @@ float4 Parchment(float2 texCoord : TEXCOORD0) : COLOR0
 	float2 texFrac = frac(tex + float2(pX, pY));
 	texFrac -= step(-texFrac, 0.0);
 #if HAS_GRAIN > 0
-	col.a += tex2D(samplerState, texFrac).r * dif * pA;
+	col.a += tex2D(t0_sampler, texFrac).r * dif * pA;
 #else
 	col.a += 0.55f * dif * pA;
 #endif

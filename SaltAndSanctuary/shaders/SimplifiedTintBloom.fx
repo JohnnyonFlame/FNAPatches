@@ -10,9 +10,9 @@ struct OutputStruct {
 	float4 Position : SV_Position;
 };
 
-texture s0_texture : register(t0);
+texture SampleTexture : register(t0);
 sampler2D s0_sampler = sampler_state {
-	Texture = (s0_texture);
+	Texture = (SampleTexture);
 	MagFilter = Linear;
 	MinFilter = Linear;
 	AddressU = Clamp;

@@ -226,7 +226,7 @@ public static class SaltPatches
 					List<CodeInstruction> newCodes = new List<CodeInstruction>();
 					newCodes.Add(new CodeInstruction(OpCodes.Call, ((Func<float>) CamMgr_Update.GetZoomLevelModifier).Method));
 					newCodes.Add(new CodeInstruction(OpCodes.Mul));
-					Console.WriteLine($"Patched CamMgr at CamMgr:Update+{i+2}!");
+					Console.WriteLine($"[zoom] Patched CamMgr at CamMgr:Update+{i+2}!");
 					codes.InsertRange(i+2, newCodes);
 					break;
 				}
@@ -309,7 +309,7 @@ public static class SaltPatches
 			mainEffectNoLightsBloom = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MainEffectNoLightsBlur.fxb");
 			mainEffectNoLightsNoBloom = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MainEffectNoLightsNoBlur.fxb");
 			clearAlphaEffect = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/ClearAlpha.fxb");
-			mapBloodEffect = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/MapBlood.fxb");
+			mapBloodEffect = (Game1_Initialize.game as Game).Content.Load<Effect>("fx/SimplifiedMapBlood.fxb");
 			mainEffect = mainEffectNoLightsBloom;	
 			isLoaded = true;
 		}
@@ -1107,7 +1107,7 @@ public static class SaltPatches
 						num3 += (1.5f - BossToast.frame) * 2f;
 					}
 					SpriteTools.End();
-					LayerTintCatalog.DrawParchmentOnly();
+					// LayerTintCatalog.DrawParchmentOnly();
 					SpriteTools.BeginSubtractive();
 					Textures.tex[LogoDraw.logoTexIdx].Draw(ScrollManager.screenSize / 2f + new Vector2(0f, textHeight), 14, new Vector2(1f, 1f) * 1.4f * num2 * scale, 3.1415927f, 1f, 1f, 1f, num3 * 0.4f);
 					Textures.tex[LogoDraw.logoTexIdx].Draw(ScrollManager.screenSize / 2f + new Vector2(0f, textHeight), 13, new Vector2(1f, 1f) * num2 * scale, 0f, 1f, 1f, 1f, num3 * 0.4f);
@@ -1462,7 +1462,7 @@ public static class SaltPatches
 		public static bool Prefix(PlayerDialog __instance, string[] dialog)
 		{
 			int words = 70;
-			if (ScrollManager.screenSize.Y <= 480f)
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				words = 50;
 			}
@@ -1488,12 +1488,14 @@ public static class SaltPatches
 		{
 			float textScale = 1f;
 			float textScaleSpace = 0.48000002f;
-			if (ScrollManager.screenSize.Y <= 480f)
+			// Just use this path for every device...
+			// Looks odd on bigger devices tho
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				float scaleX = ScrollManager.screenSize.X / 736f;
 				float scaleY = ScrollManager.screenSize.Y / 414f;
 				scale = ((scaleX < scaleY) ? scaleX : scaleY);
-				textScale = 1.25f;
+				textScale = 1.20f;
 				textScaleSpace *= textScale;
 			}
 
@@ -1512,17 +1514,22 @@ public static class SaltPatches
 				{
 					num = (5f - __instance.dialogFrame) * 5f;
 				}
-				float num2 = 0f;
+				float boxWidth = 0f;
 				for (int i = 0; i < __instance.dialogStr[__instance.dialogTextIdx].Length; i++)
 				{
 					float stringSpace = Text.GetStringSpace(__instance.dialogStr[__instance.dialogTextIdx][i], textScaleSpace, __instance.p, 0);
-					if (stringSpace > num2)
+					if (stringSpace > boxWidth)
 					{
-						num2 = stringSpace;
+						boxWidth = stringSpace;
 					}
 				}
 				int y = (int)(ScrollManager.screenSize.Y * 0.35f - (float)__instance.dialogStr[__instance.dialogTextIdx].Length * 32f * scale);
-				Rectangle rectangle = new Rectangle((int)ScrollManager.screenSize.X / 2 - (int)((num2 / 2f - 24f) * scale), y, (int)((num2 + 48f) * scale), (int)(((float)__instance.dialogStr[__instance.dialogTextIdx].Length * 32f + 32f) * scale));
+				Rectangle rectangle = new Rectangle(
+					(int)ScrollManager.screenSize.X / 2 - (int)((boxWidth / 2f - 24f) * scale),
+					y,
+					(int)((boxWidth + 48f) * scale),
+					(int)(((float)__instance.dialogStr[__instance.dialogTextIdx].Length * 32f + 32f) * scale));
+
 				int num3 = 0;
 				if (GameStateManager.coopPlayerIdx > -1 && !GameStateManager.splitScreenCoopMode)
 				{
@@ -1553,7 +1560,15 @@ public static class SaltPatches
 						rectangle.X -= rectangle.Right - ((int)ScrollManager.screenSize.X - 80);
 					}
 				}
-				InterfaceRender.DrawRect(rectangle, num * 0.5f);
+				
+				// Odd issue with text being a bit misaligned is made much worse
+				// with these patches... let's add a bit extra space just so it doesn't
+				// overflow on large screens 
+				Rectangle rectangle2 = rectangle;
+				rectangle2.X += (int)(4f * scale);
+				rectangle2.Width += (int)(12f * scale);
+
+				InterfaceRender.DrawRect(rectangle2, num * 0.5f);
 				for (int j = 0; j < __instance.dialogStr[__instance.dialogTextIdx].Length; j++)
 				{
 					Text.DrawText(__instance.dialogStr[__instance.dialogTextIdx][j], new Vector2((float)rectangle.Center.X, (float)rectangle.Y + ((float)j * 32f + 28f) * scale), new Color(1f, 1f, 1f, num), 0.6f * textScale * scale, 1);
@@ -1856,7 +1871,7 @@ public static class SaltPatches
 
 		public static int makeDescriptionSize()
 		{
-			if (ScrollManager.screenSize.Y <= 480f)
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				return 16;
 			}
@@ -1866,7 +1881,7 @@ public static class SaltPatches
 
 		public static float makeDescriptionDimensions()
 		{
-			if (ScrollManager.screenSize.Y <= 480f)
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				return 0.60f;
 			}
@@ -1876,7 +1891,7 @@ public static class SaltPatches
 
 		public static void makeNewScale(ref float scale)
 		{
-			if (ScrollManager.screenSize.Y <= 480f)
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				scale *= 1.25f;
 			}
@@ -2003,7 +2018,7 @@ public static class SaltPatches
 	{
 		public static Rectangle makeRectangleCentered(float offsX, float offsY, float Width, float Height, float scaleAdjust, ref float scale)
 		{
-			if (ScrollManager.screenSize.Y <= 480f)
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				scale = ScrollManager.screenSize.Y / scaleAdjust;
 			}
@@ -2799,10 +2814,48 @@ public static class SaltPatches
 	[HarmonyPatch(typeof(GlowMgr), MethodType.Constructor, new Type[] { typeof(ContentManager) })]
 	public class GlowMgr__ctor
 	{
+		public static Effect simplifiedLight = null;
 		public static void Postfix(GlowMgr __instance, ContentManager Content)
 		{
-			__instance.lightEffect = Content.Load<Effect>("fx/SimplifiedLight.fxb");
+			simplifiedLight = Content.Load<Effect>("fx/SimplifiedLight.fxb");
 			Console.WriteLine("Loaded reduced Light Map Effect.");
+		}
+	}
+
+	// Change the default lightmap effect to require less fillrate
+	[HarmonyPatch(typeof(GlowMgr), nameof(GlowMgr.Draw))]
+	[HarmonyPatch(new Type[] { typeof(RenderTarget2D) })]
+	public class GlowMgr_draw
+	{
+		public static bool Prefix(GlowMgr __instance, RenderTarget2D lightTarg)
+		{
+			// Use the standard path
+			if (VideoOptions__ctor.gfxPreset == 0)
+				return true;
+
+			// Use the simplified path
+			GlowMgr__ctor.simplifiedLight.Parameters["alpha"].SetValue(__instance.alpha);
+			Vector2 scroll = ScrollManager.scroll;
+			Vector2 realLoc = ScrollManager.GetRealLoc(new Vector2(0f, 0f), 2f);
+			Vector2 realLoc2 = ScrollManager.GetRealLoc(ScrollManager.screenSize, 2f);
+			Vector2 realLoc3 = ScrollManager.GetRealLoc(new Vector2(0f, 0f), 6f);
+			ScrollManager.GetRealLoc(ScrollManager.screenSize, 6f);
+			Vector2 realLoc4 = ScrollManager.GetRealLoc(new Vector2(0f, 0f), 7f);
+			ScrollManager.GetRealLoc(ScrollManager.screenSize, 7f);
+			GlowMgr__ctor.simplifiedLight.Parameters["scroll"].SetValue(realLoc + __instance.addVec[0]);
+			GlowMgr__ctor.simplifiedLight.Parameters["scroll2"].SetValue(realLoc3 + __instance.addVec[1]);
+			GlowMgr__ctor.simplifiedLight.Parameters["scroll3"].SetValue(realLoc4 + __instance.addVec[2]);
+			GlowMgr__ctor.simplifiedLight.Parameters["scrollDif"].SetValue(realLoc2 - realLoc);
+			GlowMgr__ctor.simplifiedLight.Parameters["lightFac"].SetValue(__instance.lightFac);
+			SpriteTools.sprite.GraphicsDevice.Textures[1] = __instance.cloudsTex;
+			// Disabled for the simplified renderer
+			// __instance.lightEffect.Parameters["CloudsTexture"].SetValue(__instance.cloudsTex);
+			GlowMgr__ctor.simplifiedLight.Parameters["LightTexture"].SetValue(lightTarg);
+			SpriteTools.BeginSubtractive(GlowMgr__ctor.simplifiedLight);
+			SpriteTools.sprite.Draw(lightTarg, new Rectangle(0, 0, (int)ScrollManager.screenSize.X, (int)ScrollManager.screenSize.Y), new Color(1f, 1f, 1f, __instance.alpha));
+			SpriteTools.End();
+			SpriteTools.sprite.GraphicsDevice.Textures[1] = null;
+			return false;
 		}
 	}
 
@@ -3448,7 +3501,7 @@ public static class SaltPatches
 			float scale = (scaleX < scaleY) ? scaleX : scaleY;
 
 			// We don't want this to be toooo small...
-			if (ScrollManager.screenSize.Y <= 480f)
+			//if (ScrollManager.screenSize.Y <= 480f)
 			{
 				scale *= 1.40f;
 			}
@@ -3740,6 +3793,7 @@ public static class SaltPatches
 				}
 			}
 
+			// Consumable HUD for 1.0.1.1 and lesser
 			for (int i = 0; i < codes.Count-40; i++)
 			{
 				if (
@@ -3754,8 +3808,30 @@ public static class SaltPatches
 					newCodes.Add(new CodeInstruction(OpCodes.Ldarg_S, 4));
 					newCodes.Add(new CodeInstruction(OpCodes.Ldarg_S, 1));
 					newCodes.Add(new CodeInstruction(OpCodes.Call, getNewConsumablesRectMethod));
-					Console.WriteLine($"Patched PlayerDraw at PlayerDraw:DrawSpellsAndUsables+{i}! [2]");
+					Console.WriteLine($"Patched PlayerDraw at PlayerDraw:DrawSpellsAndUsables+{i}! [2 v1]");
 					codes.RemoveRange(i, 40);
+					codes.InsertRange(i, newCodes);
+					break;
+				}
+			}
+
+			// Consumable HUD for 1.0.2.0+
+			for (int i = 0; i < codes.Count-54; i++)
+			{
+				if (
+					codes[i].opcode    == OpCodes.Ldloc_1 &&
+					codes[i+1].opcode  == OpCodes.Ldfld   &&
+					codes[i+2].opcode  == OpCodes.Ldc_R4  && (float)codes[i+2].operand == 184.0f &&
+					codes[i+54].opcode == OpCodes.Call    && codes[i+54].operand.ToString().Contains("DrawConsumableRowMinimal")
+				)
+				{
+					MethodInfo getNewConsumablesRectMethod = typeof(PlayerDraw_DrawSpellsAndUsables).GetMethod("getNewConsumablesRect", BindingFlags.Public | BindingFlags.Static);
+					List<CodeInstruction> newCodes = new List<CodeInstruction>();
+					newCodes.Add(new CodeInstruction(OpCodes.Ldarg_S, 4));
+					newCodes.Add(new CodeInstruction(OpCodes.Ldarg_S, 1));
+					newCodes.Add(new CodeInstruction(OpCodes.Call, getNewConsumablesRectMethod));
+					Console.WriteLine($"Patched PlayerDraw at PlayerDraw:DrawSpellsAndUsables+{i}! [2 v2]");
+					codes.RemoveRange(i, 54);
 					codes.InsertRange(i, newCodes);
 					break;
 				}

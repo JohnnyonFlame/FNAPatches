@@ -2,7 +2,14 @@
 // This is used twice by the bloom postprocess, first to
 // blur horizontally, and then again to blur vertically.
 
-sampler TextureSampler : register(s0);
+texture SampleTexture : register(t0);
+sampler2D s0_sampler = sampler_state {
+	Texture = (SampleTexture);
+	MagFilter = Linear;
+	MinFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
 
 #define SAMPLE_COUNT 7
 
@@ -16,7 +23,7 @@ float4 PixelShaderFunction(float2 texCoord : TEXCOORD0) : COLOR0
 	// Combine a number of weighted image filter taps.
 	for (int i = 0; i < SAMPLE_COUNT; i++)
 	{
-		c += tex2D(TextureSampler, texCoord + SampleOffsets[i]) * SampleWeights[i];
+		c += tex2D(s0_sampler, texCoord + SampleOffsets[i]) * SampleWeights[i];
 	}
 	
 	return c;
