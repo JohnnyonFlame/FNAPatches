@@ -173,13 +173,15 @@ public static class ChasmPatches
         }
     }
 
-    [HarmonyPatch(typeof(AcheivementMessage), nameof(AcheivementMessage.Draw))]
-    static class AcheivementMessage_Draw
+    [HarmonyPatch(typeof(Chasm.Gameplay.Database), "LoadTextureKey")]
+    private static class Database_LoadTextureKey
     {
-        private static bool Prefix(AcheivementMessage __instance)
+        private static void Postfix(string key, bool forceLowMem = false)
         {
-            // Don't draw achievements...
-            return false;
+            // Achievement icons live in the drmfree atlas.
+            // On low-memory platforms, texture bank switches can leave it unloaded,
+            // causing achievement popups to render black/missing icons or crash.
+            Chasm.Gameplay.Database.LoadTextureKeyNoUnload("drmfree");
         }
     }
 
