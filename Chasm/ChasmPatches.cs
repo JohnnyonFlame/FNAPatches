@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -170,6 +171,71 @@ public static class ChasmPatches
             }
             
             return codes.AsEnumerable();
+        }
+    }
+
+    // The DRM-free PCPlatform writes each local achievement's unlocked flag to
+    // UserInfo.cfg, but its stock loader reads and discards those same values.
+    // Since this patch substitutes PCPlatform for SteamPlatform, that makes every
+    // achievement look locked again after restarting the game. Restore the
+    // serialized flags and silently recover count-based achievements from the
+    // cumulative stats already present in older affected saves.
+    [HarmonyPatch(typeof(PCPlatform), nameof(PCPlatform.UserInfoCustomLoad))]
+    static class PCPlatform_UserInfoCustomLoad
+    {
+        static bool Prefix(UserInfo __0, BinaryReader __1)
+        {
+            int count = __1.ReadInt32();
+            int restored = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                string id = __1.ReadString();
+                bool savedUnlocked = __1.ReadBoolean();
+
+                if (!__0.Achievements.ContainsKey(id))
+                {
+                    continue;
+                }
+
+                Achievement achievement = __0.Achievements[id];
+                achievement.IsUnlocked = achievement.IsUnlocked || savedUnlocked;
+                __0.Achievements[id] = achievement;
+                if (savedUnlocked)
+                {
+                    restored++;
+                }
+            }
+
+            int recovered = 0;
+            foreach (string id in new List<string>(__0.Achievements.Keys))
+            {
+                Achievement achievement = __0.Achievements[id];
+                if (achievement.IsUnlocked
+                    || achievement.CountToUnlock <= 0
+                    || string.IsNullOrWhiteSpace(achievement.StatName)
+                    || !__0.UserStats.ContainsKey(achievement.StatName)
+                    || __0.UserStats[achievement.StatName] < achievement.CountToUnlock)
+                {
+                    continue;
+                }
+
+                achievement.IsUnlocked = true;
+                __0.Achievements[id] = achievement;
+                recovered++;
+            }
+
+            if (recovered > 0)
+            {
+                __0.NeedsSaved = true;
+            }
+
+            Console.Out.WriteLine(
+                $"Achievement persistence: read {count}, restored {restored}, " +
+                $"recovered {recovered} from cumulative stats."
+            );
+
+            return false;
         }
     }
 
